@@ -243,7 +243,7 @@ function ArticleView({ news }) {
       </CardHeader>
       <CardContent className="p-8 space-y-6">
         {/* Short Description */}
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 border-l-4 border-blue-500">
+        <div className="bg-gradient-to-r ">
           <p className="text-lg leading-relaxed text-slate-700 whitespace-pre-line font-medium">{news.shortDescription}</p>
         </div>
         <Separator />

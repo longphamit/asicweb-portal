@@ -17,6 +17,7 @@ export const contentController = {
           .find({})
           .project({ content: 0 }) // 👈 0 = loại bỏ trường content
           .limit(50)
+          .sort ({ createdAt: -1 })
           .toArray();
     
         return accounts;
@@ -38,7 +39,7 @@ export const contentController = {
   async update(id, data) {
     const db = await getDb();
     const result = await db.collection(COLLECTION_NAME).updateOne(
-      { _id: new ObjectId(id) },
+      { _id: id },
       { $set: { ...data, updatedAt: new Date() } }
     );
     return result;

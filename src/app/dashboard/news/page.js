@@ -7,6 +7,20 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 
+// Hàm format ngày theo HH:mm dd/MM/yyyy
+function formatDate(dateStr) {
+  const date = new Date(dateStr);
+  const pad = (n) => n.toString().padStart(2, "0");
+
+  const hours = pad(date.getHours());
+  const minutes = pad(date.getMinutes());
+  const day = pad(date.getDate());
+  const month = pad(date.getMonth() + 1);
+  const year = date.getFullYear();
+
+  return `${hours}:${minutes} ${day}/${month}/${year}`;
+}
+
 export default function NewsPage() {
   const [newsList, setNewsList] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -61,12 +75,11 @@ export default function NewsPage() {
                     >
                       {news.title}
                     </TableCell>
-                    <TableCell>{new Date(news.createdAt).toLocaleDateString()}</TableCell>
+                    <TableCell>{formatDate(news.createdAt)}</TableCell>
                     <TableCell>{news.author || "—"}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
-
             </Table>
           )}
         </CardContent>
