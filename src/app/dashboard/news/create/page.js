@@ -54,7 +54,7 @@ export default function CreateNewsPage() {
       <div className="container mx-auto px-4">
         <Card className="max-w-4xl mx-auto shadow-xl bg-white/90 backdrop-blur-sm">
           {/* Header */}
-          <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b p-6 flex justify-between items-center">
+          <CardHeader className="bg-gradient-to-r border-b p-6 flex justify-between items-center">
             {/* Nút quay về bên trái */}
             <Button
               variant="outline"
@@ -102,7 +102,7 @@ export default function CreateNewsPage() {
                   onChange={(e) => setShortDescription(e.target.value)}
                   placeholder="Nhập mô tả ngắn"
                   rows={4}
-                  className="resize-none bg-blue-50 border-l-4 border-blue-500 p-3 font-medium whitespace-pre-line"
+                  className="resize-none p-3 font-medium whitespace-pre-line"
                   required
                 />
               </div>

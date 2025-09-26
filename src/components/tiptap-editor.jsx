@@ -90,7 +90,7 @@ export default function TiptapEditor({ onUpdate, initialContent = "" }) {
   return (
     <div className="tiptap-wrapper">
       <MenuBar editor={editor} />
-      <EditorContent editor={editor} className="tiptap" />
+      <EditorContent editor={editor} className="tiptap p-3" />
     </div>
   );
 }
