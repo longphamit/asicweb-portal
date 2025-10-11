@@ -4,12 +4,21 @@ import { contentController }  from '../../../lib/controller/contentController';
 
 export async function GET(req) {
   try {
-    const contents = await contentController.getAll();
+    // 🔍 Lấy query params từ URL
+    const { searchParams } = new URL(req.url);
+    const page = parseInt(searchParams.get("page")) || 1;
+    const limit = parseInt(searchParams.get("limit")) || 10;
+
+    // 📜 Gọi controller với phân trang
+    const contents = await contentController.getAll(page, limit);
+
     return NextResponse.json(contents);
   } catch (error) {
+    console.error("❌ Lỗi khi lấy danh sách nội dung:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
 
 export async function POST(req) {
   try {

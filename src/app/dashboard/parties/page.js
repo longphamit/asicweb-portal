@@ -30,6 +30,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import ConfirmDialog from "@/components/confirm-dialog";
+import { Plus } from "lucide-react";
+import Image from "next/image";
 
 export default function ProfilePage() {
   const [profiles, setProfiles] = useState([]);
@@ -41,7 +43,9 @@ export default function ProfilePage() {
     email: "",
     phone: "",
     role: "EMPLOYEE",
+    position: "Researcher",
     type: "PERSONAL",
+    image: null,
   });
   const [accountData, setAccountData] = useState({
     username: "",
@@ -49,6 +53,7 @@ export default function ProfilePage() {
   });
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [previewImage, setPreviewImage] = useState(null);
 
   // 📌 Lấy danh sách hồ sơ
   const fetchProfiles = async () => {
@@ -61,7 +66,8 @@ export default function ProfilePage() {
         data.map((p) => ({
           ...p,
           _id: p._id?.toString?.() || p._id,
-          accountId: p.accountId || null, // lấy accountId nếu có
+          accountId: p.accountId || null,
+          image: p.image || null, // Lưu image là ID
         }))
       );
     } catch (e) {
@@ -76,14 +82,37 @@ export default function ProfilePage() {
     fetchProfiles();
   }, []);
 
+  // 📌 Xử lý upload hình ảnh
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) { // Giới hạn 5MB
+        toast.error("Hình ảnh quá lớn", { description: "Vui lòng chọn hình ảnh dưới 5MB" });
+        return;
+      }
+      setFormData({ ...formData, image: file });
+      setPreviewImage(URL.createObjectURL(file));
+    }
+  };
+
   // 📌 Tạo hồ sơ mới
   const handleCreateProfile = async (e) => {
     e.preventDefault();
     try {
+      const formDataToSend = new FormData();
+      formDataToSend.append("name", formData.name);
+      formDataToSend.append("email", formData.email);
+      formDataToSend.append("phone", formData.phone);
+      formDataToSend.append("role", formData.role);
+      formDataToSend.append("position", formData.position);
+      formDataToSend.append("type", formData.type);
+      if (formData.image) {
+        formDataToSend.append("image", formData.image);
+      }
+
       const res = await fetch("/api/parties", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: formDataToSend,
       });
       if (!res.ok) throw new Error(await res.text());
       toast.success("Tạo hồ sơ thành công!", { description: `${formData.name} đã được tạo.` });
@@ -93,8 +122,11 @@ export default function ProfilePage() {
         email: "",
         phone: "",
         role: "EMPLOYEE",
+        position: "Researcher",
         type: "PERSONAL",
+        image: null,
       });
+      setPreviewImage(null);
       await fetchProfiles();
     } catch (err) {
       setError(err.message);
@@ -170,13 +202,15 @@ export default function ProfilePage() {
 
   const typeLabel = (type) => (type === "ORGANIZATION" ? "Tổ chức" : "Cá nhân");
   const roleLabel = (role) =>
-    role === "EMPLOYEE"
-      ? "Nhân viên"
-      : role === "COLLABORATOR"
-        ? "Cộng tác viên"
-        : role === "INTERN"
-          ? "Thực tập sinh"
-          : "Đối tác";
+    role === "EMPLOYEE" ? "Nhân viên" : "Đối tác";
+  const positionLabel = (position) =>
+    ({
+      LaboratoryDirector: "Giám đốc phòng thí nghiệm",
+      PrincipalResearcher: "Nhà nghiên cứu chính",
+      Researcher: "Nhà nghiên cứu",
+      Collaborator: "Cộng tác viên",
+      Intern: "Thực tập sinh",
+    }[position] || position);
 
   return (
     <div className="flex flex-col items-center min-h-screen bg-gray-100 p-6">
@@ -185,7 +219,9 @@ export default function ProfilePage() {
           <CardTitle className="text-2xl">Danh Sách Hồ Sơ</CardTitle>
           <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
             <DialogTrigger asChild>
-              <Button>Thêm Hồ Sơ Mới</Button>
+              <Button>
+                <Plus className="w-4 h-4 mr-2" /> Tạo
+              </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[500px]">
               <DialogHeader>
@@ -225,6 +261,29 @@ export default function ProfilePage() {
                     />
                   </div>
                   <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="image" className="text-right">Hình ảnh</Label>
+                    <div className="col-span-3">
+                      <Input
+                        id="image"
+                        type="file"
+                        accept="image/*"
+                        className="col-span-3"
+                        onChange={handleImageChange}
+                      />
+                      {previewImage && (
+                        <div className="mt-2">
+                          <Image
+                            src={previewImage}
+                            alt="Preview"
+                            width={100}
+                            height={100}
+                            className="object-cover rounded"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="role" className="text-right">Vai trò</Label>
                     <select
                       id="role"
@@ -233,9 +292,22 @@ export default function ProfilePage() {
                       onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                     >
                       <option value="EMPLOYEE">Nhân viên</option>
-                      <option value="COLLABORATOR">Cộng tác viên</option>
-                      <option value="INTERN">Thực tập sinh</option>
                       <option value="PARTNER">Đối tác</option>
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="position" className="text-right">Vị trí</Label>
+                    <select
+                      id="position"
+                      className="col-span-3 border rounded px-2 py-1"
+                      value={formData.position}
+                      onChange={(e) => setFormData({ ...formData, position: e.target.value })}
+                    >
+                      <option value="LaboratoryDirector">Giám đốc phòng thí nghiệm</option>
+                      <option value="PrincipalResearcher">Nhà nghiên cứu chính</option>
+                      <option value="Researcher">Nhà nghiên cứu</option>
+                      <option value="Collaborator">Cộng tác viên</option>
+                      <option value="Intern">Thực tập sinh</option>
                     </select>
                   </div>
                   <div className="grid grid-cols-4 items-center gap-4">
@@ -265,7 +337,10 @@ export default function ProfilePage() {
                   </div>
                 </div>
                 <DialogFooter>
-                  <Button variant="outline" type="button" onClick={() => setIsCreateOpen(false)}>Hủy</Button>
+                  <Button variant="outline" type="button" onClick={() => {
+                    setIsCreateOpen(false);
+                    setPreviewImage(null);
+                  }}>Hủy</Button>
                   <Button type="submit">Lưu</Button>
                 </DialogFooter>
               </form>
@@ -280,9 +355,11 @@ export default function ProfilePage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Hình ảnh</TableHead>
                   <TableHead>Tên</TableHead>
                   <TableHead>Loại hồ sơ</TableHead>
                   <TableHead>Vai trò</TableHead>
+                  <TableHead>Vị trí</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Số điện thoại</TableHead>
                   <TableHead>Tài khoản</TableHead>
@@ -292,9 +369,25 @@ export default function ProfilePage() {
               <TableBody>
                 {profiles.map((p) => (
                   <TableRow key={p._id}>
+                    <TableCell>
+                      {p.image ? (
+                        <Image
+                          src={`/api/files/${p.image}`}
+                          alt={p.name}
+                          width={50}
+                          height={50}
+                          className="object-cover rounded"
+                        />
+                      ) : (
+                        <div className="w-[50px] h-[50px] bg-gray-200 rounded flex items-center justify-center">
+                          N/A
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell>{p.name || "Không rõ"}</TableCell>
                     <TableCell>{typeLabel(p.type)}</TableCell>
                     <TableCell>{roleLabel(p.role)}</TableCell>
+                    <TableCell>{positionLabel(p.position)}</TableCell>
                     <TableCell>{p.email || "—"}</TableCell>
                     <TableCell>{p.phone || "—"}</TableCell>
                     <TableCell>

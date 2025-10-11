@@ -1,5 +1,6 @@
 // lib/controllers/partyController.js
 import { createDocument, getDb } from "@/lib/mongodb";
+import { saveFile } from "./fileController";
 
 const COLLECTION_NAME = "party";
 
@@ -23,6 +24,11 @@ export async function getParties() {
         account: { $arrayElemAt: ["$account", 0] },
       },
     },
+    {
+      $match: {
+        "name": { $ne: "admin" }, // name ≠ 'admin'
+      },
+    },
     { $sort: { createdAt: -1 } },
   ]).toArray();
 
@@ -30,10 +36,23 @@ export async function getParties() {
 }
 
 /**
- * 📌 Tạo mới một party
+ * 📌 Tạo mới một party với hỗ trợ upload hình ảnh
+ * @param {Object} partyData - Dữ liệu của party
+ * @param {File} imageFile - File hình ảnh (nếu có)
  */
-export async function createParty(partyData) {
-  return createDocument(COLLECTION_NAME, partyData);
+export async function createParty(partyData, imageFile = null) {
+  // Chỉ cho phép các loại file ảnh
+  const imageId = await saveFile(imageFile, {
+    maxSize: 5 * 1024 * 1024, // 5MB
+    allowedTypes: ["image/jpeg", "image/png", "image/jpg", "image/gif"],
+  });
+
+  const partyDoc = {
+    ...partyData,
+    image: imageId, // Lưu ID của file
+  };
+
+  return createDocument(COLLECTION_NAME, partyDoc);
 }
 
 /**
@@ -51,7 +70,7 @@ export async function getPartyById(partyId) {
  */
 export async function updatePartyAccountStatus(partyId, haveAccount) {
   const db = await getDb();
-  
+
   const result = await db.collection(COLLECTION_NAME).updateOne(
     { _id: partyId },
     {

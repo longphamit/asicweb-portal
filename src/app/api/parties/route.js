@@ -17,8 +17,19 @@ export async function GET() {
 
 export async function POST(req) {
   try {
-    const body = await req.json();
-    const newPartyId = await createParty(body);
+    const formData = await req.formData();
+    const imageFile = formData.get("image");
+
+    const partyData = {
+      name: formData.get("name"),
+      email: formData.get("email"),
+      phone: formData.get("phone"),
+      role: formData.get("role"),
+      position: formData.get("position"),
+      type: formData.get("type"),
+    };
+
+    const newPartyId = await createParty(partyData, imageFile);
     return NextResponse.json(
       { message: "Tạo party thành công", partyId: newPartyId },
       { status: 201 }

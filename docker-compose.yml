@@ -1,10 +1,26 @@
 version: "3.9"
+
 services:
   nextjs-app:
-    image: longphamjustdoit/asicweb-portal:latest   # 🐳 thay bằng tên image của bạn
-    container_name: nextjs-app
+    image: longphamjustdoit/asicweb-portal:latest
+    container_name: asicweb-portal
     ports:
-      - "3030:3000"              # map cổng host:container
+      - "3001:3000"
     environment:
       - NODE_ENV=production
-    restart: always              # tự khởi động lại nếu container crash
+      - MONGODB_URI=mongodb://asiclab:asIclabX2X25@mongodb:27017/admin
+      - NEXTAUTH_SECRET=asiclab-portal-3748376439847334343
+      - NEXTAUTH_URL=https://asicweb-portal.longpc.xyz
+    restart: always
+    networks:
+      - asicweb
+    volumes:
+      - ./uploads:/app/public/uploads
+
+networks:
+  asicweb:
+    external: true
+
+volumes:
+  uploads:
+    name: uploads

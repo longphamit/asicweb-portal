@@ -1,30 +1,75 @@
 // src/controllers/contentController.js
-import { createDocument, deleteDocumentById, getAllDocuments, getDb, getDocumentById } from "@/lib/mongodb";
+import {
+  createDocument,
+  deleteDocumentById,
+  getDb,
+  getDocumentById,
+} from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
-import { da } from "zod/v4/locales";
 
 const COLLECTION_NAME = "content";
 
 export const contentController = {
-  async getAll() {
+  async getAll(page = 1, limit = 10) {
     try {
-        console.log("Connecting to MongoDB...");
-        const db = await getDb();
-    
-        console.log("Fetching accounts...");
-        const accounts = await db
-          .collection(COLLECTION_NAME)
-          .find({})
-          .project({ content: 0 }) // 👈 0 = loại bỏ trường content
-          .limit(50)
-          .sort ({ createdAt: -1 })
-          .toArray();
-    
-        return accounts;
-      } catch (e) {
-        console.error("Error in getAccounts:", e);
-        throw new Error("Lỗi khi lấy danh sách tài khoản");
-      }
+      console.log("Connecting to MongoDB...");
+      const db = await getDb();
+
+      const skip = (page - 1) * limit;
+      const total = await db.collection(COLLECTION_NAME).countDocuments({});
+
+      console.log("Fetching contents...");
+      const contents = await db
+        .collection(COLLECTION_NAME)
+        .find({})
+        .project({ content: 0 }) // 👈 loại bỏ trường content
+        .skip(skip)
+        .limit(limit)
+        .sort({ createdAt: -1 })
+        .toArray();
+
+      return {
+        data: contents,
+        total,
+        page,
+        totalPages: Math.ceil(total / limit),
+      };
+    } catch (e) {
+      console.error("Error in getAll:", e);
+      throw new Error("Lỗi khi lấy danh sách nội dung");
+    }
+  },
+
+  async getPublished(page = 1, limit = 10) {
+    try {
+      console.log("Connecting to MongoDB...");
+      const db = await getDb();
+
+      const skip = (page - 1) * limit;
+      const total = await db
+        .collection(COLLECTION_NAME)
+        .countDocuments({ published: true });
+
+      console.log("Fetching published contents...");
+      const contents = await db
+        .collection(COLLECTION_NAME)
+        .find({ published: true }) // ✅ lọc theo trạng thái đã xuất bản
+        .project({ content: 0 })
+        .skip(skip)
+        .limit(limit)
+        .sort({ createdAt: -1 })
+        .toArray();
+
+      return {
+        data: contents,
+        total,
+        page,
+        totalPages: Math.ceil(total / limit),
+      };
+    } catch (e) {
+      console.error("Error in getPublished:", e);
+      throw new Error("Lỗi khi lấy danh sách nội dung đã xuất bản");
+    }
   },
 
   async getById(id) {
@@ -39,7 +84,7 @@ export const contentController = {
   async update(id, data) {
     const db = await getDb();
     const result = await db.collection(COLLECTION_NAME).updateOne(
-      { _id: id },
+      { _id: new ObjectId(id) },
       { $set: { ...data, updatedAt: new Date() } }
     );
     return result;

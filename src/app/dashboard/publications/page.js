@@ -50,10 +50,9 @@ export default function PublicationsListPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 py-8">
-      <div className="container mx-auto px-4">
-        <Card className="shadow-lg">
-          <CardHeader className="flex justify-between items-center border-b">
+    <div className="flex flex-col items-center min-h-screen">
+      <div className="w-full max-w-6xl">
+        <CardHeader className="flex justify-between items-center">
             <CardTitle className="text-xl font-bold">Danh sách công bố khoa học</CardTitle>
             <div className="flex gap-2">
               <Button
@@ -62,7 +61,7 @@ export default function PublicationsListPage() {
                 onClick={() => router.push("/dashboard/publications/create")}
               >
                 <Plus className="w-4 h-4 mr-2" />
-                Tạo công bố
+                Tạo
               </Button>
               <Button
                 variant="secondary"
@@ -137,7 +136,6 @@ export default function PublicationsListPage() {
               </Table>
             )}
           </CardContent>
-        </Card>
       </div>
     </div>
   );

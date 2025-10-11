@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { v4 as uuidv4 } from "uuid";
-import {clientPromise} from "@/lib/mongodb"; // hoặc file getDb của bạn
+import { clientPromise } from "@/lib/mongodb"; // hoặc file getDb của bạn
 
 export async function POST(req) {
   try {
@@ -23,10 +23,11 @@ export async function POST(req) {
       title: pub.title,
       members: pub.members,
       type: (pub.type || "journal").toLowerCase(),
-      venueName: pub.venueName,
+      venueName: pub.venueName || pub.venuename || "", // dùng fallback
       abstract: pub.abstract || "",
       doi: pub.doi || ""
     }));
+
 
     // Insert nhiều publications
     const result = await db.collection("publication").insertMany(preparedData);

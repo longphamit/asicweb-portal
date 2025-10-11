@@ -10,6 +10,7 @@ import {
   IconFolder,
   IconDatabase,
   IconInnerShadowTop,
+  IconBook, // 📚 icon cho Courses
 } from "@tabler/icons-react";
 import { NavDocuments } from "@/components/nav-documents";
 import { NavSecondary } from "@/components/nav-secondary";
@@ -43,18 +44,20 @@ function NavMain({ items }) {
 
 export function AppSidebar({ ...props }) {
   const { data: session } = useSession();
-  const party = session?.user?.party; // Lấy party từ session
+  const party = session?.user?.party;
   const user = {
     name: party?.name || "User",
     email: session?.user?.email || "",
     avatar: party?.avatar || "/avatars/shadcn.jpg",
   };
 
+  // ✅ Thêm Courses vào menu chính
   const navMain = [
     { title: "Dashboard", url: "/dashboard", icon: IconDashboard },
     { title: "Profile", url: "/dashboard/parties", icon: IconListDetails },
     { title: "News", url: "/dashboard/news", icon: IconChartBar },
     { title: "Publications", url: "/dashboard/publications", icon: IconFolder },
+    { title: "Courses", url: "/dashboard/courses", icon: IconBook }, // 📚 Courses mới thêm
   ];
 
   const documents = [

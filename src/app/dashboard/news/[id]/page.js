@@ -1,4 +1,4 @@
-'use client'
+"use client";
 
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
@@ -10,7 +10,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ArrowLeft, Edit2, Save, X, Calendar, Clock, User } from "lucide-react";
+import {
+  ArrowLeft,
+  Edit2,
+  Save,
+  X,
+  Calendar,
+  Clock,
+  User,
+  Upload,
+  EyeOff,
+} from "lucide-react";
 
 import Editor from "@/components/tiptap-editor";
 
@@ -23,6 +33,7 @@ export default function NewsDetailPage() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
 
   const [title, setTitle] = useState("");
   const [shortDescription, setShortDescription] = useState("");
@@ -74,6 +85,29 @@ export default function NewsDetailPage() {
     }
   };
 
+  const handleTogglePublish = async () => {
+    if (!news) return;
+    try {
+      setUpdatingStatus(true);
+      const res = await fetch(`/api/news/${id}/update-publish`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ published: !news.published }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      toast.success(
+        !news.published ? "✅ Xuất bản thành công!" : "🗑️ Đã gỡ xuất bản!"
+      );
+      await fetchNews();
+    } catch (err) {
+      toast.error("Lỗi khi thay đổi trạng thái bài viết", {
+        description: err.message,
+      });
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
   const handleCancel = () => {
     setEditing(false);
     if (news) {
@@ -89,7 +123,15 @@ export default function NewsDetailPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
       <div className="container mx-auto px-4 py-8">
-        <HeaderSection editing={editing} handleCancel={handleCancel} setEditing={setEditing} id={id} />
+        <HeaderSection
+          editing={editing}
+          handleCancel={handleCancel}
+          setEditing={setEditing}
+          id={id}
+          news={news}
+          onTogglePublish={handleTogglePublish}
+          updatingStatus={updatingStatus}
+        />
         <div className="max-w-4xl mx-auto space-y-6">
           {editing ? (
             <EditCard
@@ -113,7 +155,15 @@ export default function NewsDetailPage() {
 }
 
 /* Header */
-function HeaderSection({ editing, handleCancel, setEditing, id }) {
+function HeaderSection({
+  editing,
+  handleCancel,
+  setEditing,
+  id,
+  news,
+  onTogglePublish,
+  updatingStatus,
+}) {
   const router = useRouter();
   return (
     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
@@ -131,12 +181,52 @@ function HeaderSection({ editing, handleCancel, setEditing, id }) {
         <Badge variant="secondary" className="text-sm">
           Tin tức #{id}
         </Badge>
+        {news?.published ? (
+          <>
+            <Badge variant="success" className="ml-2 bg-green-100 text-green-700">
+              ✅ Xuất bản
+            </Badge>
+            {news.publishedAt && (
+              <Badge variant="outline" className="ml-2 bg-green-100 text-green-700">
+                📅 {new Date(news.publishedAt).toLocaleDateString("vi-VN")}
+              </Badge>
+            )}
+          </>
+        ) : (
+          <Badge variant="outline" className="ml-2 bg-yellow-50 text-yellow-700">
+            ⏳ Chưa xuất bản
+          </Badge>
+        )}
       </div>
       <div className="flex gap-2">
+        {!editing && (
+          <Button
+            size="sm"
+            variant={news?.published ? "destructive" : "default"}
+            onClick={onTogglePublish}
+            disabled={updatingStatus}
+            className={`text-white ${news?.published
+              ? "bg-red-600 hover:bg-red-700"
+              : "bg-green-600 hover:bg-green-700"
+            }`}
+          >
+            {updatingStatus ? (
+              <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
+            ) : news?.published ? (
+              <>
+                <EyeOff className="w-4 h-4 mr-2" /> Gỡ xuất bản
+              </>
+            ) : (
+              <>
+                <Upload className="w-4 h-4 mr-2" /> Xuất bản
+              </>
+            )}
+          </Button>
+        )}
         <Button
           variant={editing ? "outline" : "default"}
           size="sm"
-          onClick={() => editing ? handleCancel() : setEditing(true)}
+          onClick={() => (editing ? handleCancel() : setEditing(true))}
         >
           {editing ? (
             <>
@@ -160,7 +250,9 @@ function LoadingCard() {
       <Card className="w-96 shadow-lg">
         <CardContent className="p-8 flex flex-col items-center space-y-4">
           <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
-          <p className="text-lg font-medium text-slate-600">Đang tải tin tức...</p>
+          <p className="text-lg font-medium text-slate-600">
+            Đang tải tin tức...
+          </p>
         </CardContent>
       </Card>
     </div>
@@ -177,7 +269,9 @@ function NotFoundCard() {
           <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center">
             <X className="w-8 h-8 text-red-500" />
           </div>
-          <p className="text-lg font-medium text-slate-600">Không tìm thấy tin tức</p>
+          <p className="text-lg font-medium text-slate-600">
+            Không tìm thấy tin tức
+          </p>
           <Button onClick={() => router.push("/dashboard/news")} variant="outline">
             <ArrowLeft className="w-4 h-4 mr-2" /> Quay về danh sách
           </Button>
@@ -188,7 +282,17 @@ function NotFoundCard() {
 }
 
 /* Edit Mode Card */
-function EditCard({ title, setTitle, shortDescription, setShortDescription, content, handleEditorUpdate, handleUpdate, handleCancel, saving }) {
+function EditCard({
+  title,
+  setTitle,
+  shortDescription,
+  setShortDescription,
+  content,
+  handleEditorUpdate,
+  handleUpdate,
+  handleCancel,
+  saving,
+}) {
   return (
     <Card className="shadow-lg bg-white/80 backdrop-blur-sm">
       <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
@@ -199,26 +303,58 @@ function EditCard({ title, setTitle, shortDescription, setShortDescription, cont
       <CardContent className="p-6 flex flex-col gap-6">
         {/* Title */}
         <div className="space-y-2">
-          <Label htmlFor="title" className="text-sm font-medium text-slate-700">Tiêu đề</Label>
-          <Input id="title" value={title} onChange={e => setTitle(e.target.value)} className="text-lg font-medium" placeholder="Nhập tiêu đề tin tức..." />
+          <Label htmlFor="title" className="text-sm font-medium text-slate-700">
+            Tiêu đề
+          </Label>
+          <Input
+            id="title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="text-lg font-medium"
+            placeholder="Nhập tiêu đề tin tức..."
+          />
         </div>
         {/* Short Description */}
         <div className="space-y-2">
-          <Label htmlFor="shortDescription" className="text-sm font-medium text-slate-700">Mô tả ngắn</Label>
-          <Textarea id="shortDescription" value={shortDescription} onChange={e => setShortDescription(e.target.value)} rows={4} className="resize-none" placeholder="Nhập mô tả ngắn..." />
+          <Label
+            htmlFor="shortDescription"
+            className="text-sm font-medium text-slate-700"
+          >
+            Mô tả ngắn
+          </Label>
+          <Textarea
+            id="shortDescription"
+            value={shortDescription}
+            onChange={(e) => setShortDescription(e.target.value)}
+            rows={4}
+            className="resize-none"
+            placeholder="Nhập mô tả ngắn..."
+          />
         </div>
         {/* Content */}
         <div className="space-y-2">
-          <Label htmlFor="content" className="text-sm font-medium text-slate-700">Nội dung</Label>
+          <Label
+            htmlFor="content"
+            className="text-sm font-medium text-slate-700"
+          >
+            Nội dung
+          </Label>
           <div className="border rounded-lg bg-white min-h-[300px]">
             <Editor initialContent={content} onUpdate={handleEditorUpdate} />
           </div>
         </div>
         {/* Buttons */}
         <div className="flex justify-end gap-3 mt-4">
-          <Button variant="outline" onClick={handleCancel} size="lg"><X className="w-4 h-4 mr-2" /> Hủy</Button>
-          <Button onClick={handleUpdate} disabled={saving} size="lg" >
-            {saving ? <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div> : <Save className="w-4 h-4 mr-2" />} Lưu thay đổi
+          <Button variant="outline" onClick={handleCancel} size="lg">
+            <X className="w-4 h-4 mr-2" /> Hủy
+          </Button>
+          <Button onClick={handleUpdate} disabled={saving} size="lg">
+            {saving ? (
+              <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
+            ) : (
+              <Save className="w-4 h-4 mr-2" />
+            )}
+            Lưu thay đổi
           </Button>
         </div>
       </CardContent>
@@ -232,24 +368,49 @@ function ArticleView({ news }) {
     <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-sm overflow-hidden">
       <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 border-b p-8">
         <div className="space-y-4">
-          <CardTitle className="text-3xl lg:text-4xl font-bold text-slate-800 leading-tight">{news.title}</CardTitle>
+          <CardTitle className="text-3xl lg:text-4xl font-bold text-slate-800 leading-tight">
+            {news.title}
+          </CardTitle>
+
           {/* Meta */}
           <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500">
-            {news.createdAt && <div className="flex items-center gap-1"><Calendar className="w-4 h-4" /> {new Date(news.createdAt).toLocaleDateString('vi-VN')}</div>}
-            {news.updatedAt && <div className="flex items-center gap-1"><Clock className="w-4 h-4" /> Cập nhật: {new Date(news.updatedAt).toLocaleDateString('vi-VN')}</div>}
-            {news.author && <div className="flex items-center gap-1"><User className="w-4 h-4" /> {news.author}</div>}
+            {news.createdAt && (
+              <div className="flex items-center gap-1">
+                <Calendar className="w-4 h-4" /> Tạo: {new Date(news.createdAt).toLocaleDateString("vi-VN")}
+              </div>
+            )}
+            {news.updatedAt && (
+              <div className="flex items-center gap-1">
+                <Clock className="w-4 h-4" /> Cập nhật: {new Date(news.updatedAt).toLocaleDateString("vi-VN")}
+              </div>
+            )}
+            {news.published && news.publishedAt && (
+              <div className="flex items-center gap-1">
+                <Calendar className="w-4 h-4" /> Xuất bản: {new Date(news.publishedAt).toLocaleDateString("vi-VN")}
+              </div>
+            )}
+            {news.author && (
+              <div className="flex items-center gap-1">
+                <User className="w-4 h-4" /> {news.author}
+              </div>
+            )}
           </div>
         </div>
       </CardHeader>
       <CardContent className="p-8 space-y-6">
         {/* Short Description */}
-        <div className="bg-gradient-to-r ">
-          <p className="text-lg leading-relaxed text-slate-700 whitespace-pre-line font-medium">{news.shortDescription}</p>
+        <div className="bg-gradient-to-r">
+          <p className="text-lg leading-relaxed text-slate-700 whitespace-pre-line font-medium">
+            {news.shortDescription}
+          </p>
         </div>
         <Separator />
         {/* Content */}
         <div className="prose prose-slate max-w-none lg:prose-lg">
-          <div className="leading-relaxed" dangerouslySetInnerHTML={{ __html: news.content }} />
+          <div
+            className="leading-relaxed"
+            dangerouslySetInnerHTML={{ __html: news.content }}
+          />
         </div>
       </CardContent>
     </Card>

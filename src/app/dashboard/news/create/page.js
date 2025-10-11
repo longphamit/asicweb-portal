@@ -1,6 +1,6 @@
-'use client'
+"use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,19 +8,49 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, Save, RefreshCcw } from "lucide-react";
 
 import Editor from "@/components/tiptap-editor";
+
+// 🌀 Hàm tạo slug chuẩn SEO
+const slugify = (text) =>
+  text
+    .toLowerCase()
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-");
 
 export default function CreateNewsPage() {
   const router = useRouter();
 
   const [title, setTitle] = useState("");
+  const [slug, setSlug] = useState("");
   const [shortDescription, setShortDescription] = useState("");
   const [content, setContent] = useState("");
   const [saving, setSaving] = useState(false);
+  const userEditedSlug = useRef(false);
+
+  // ✅ Tự tạo slug khi title thay đổi nếu user chưa chỉnh tay
+  useEffect(() => {
+    if (!userEditedSlug.current) {
+      setSlug(slugify(title));
+    }
+  }, [title]);
 
   const handleEditorUpdate = (html) => setContent(html);
+
+  const handleSlugChange = (e) => {
+    userEditedSlug.current = true;
+    setSlug(slugify(e.target.value));
+  };
+
+  const regenerateSlug = () => {
+    setSlug(slugify(title));
+    userEditedSlug.current = false;
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -35,7 +65,7 @@ export default function CreateNewsPage() {
       const res = await fetch("/api/news", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, shortDescription, content }),
+        body: JSON.stringify({ title, slug, shortDescription, content }),
       });
 
       if (!res.ok) throw new Error(await res.text());
@@ -55,22 +85,15 @@ export default function CreateNewsPage() {
         <Card className="max-w-4xl mx-auto shadow-xl bg-white/90 backdrop-blur-sm">
           {/* Header */}
           <CardHeader className="bg-gradient-to-r border-b p-6 flex justify-between items-center">
-            {/* Nút quay về bên trái */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => router.push("/dashboard/news")}
-            >
+            <Button variant="outline" size="sm" onClick={() => router.push("/dashboard/news")}>
               <ArrowLeft className="w-4 h-4 mr-2" />
               Quay về
             </Button>
 
-            {/* Tiêu đề */}
             <CardTitle className="text-2xl font-bold text-slate-800">
               Tạo tin tức mới
             </CardTitle>
 
-            {/* Khoảng trống bên phải */}
             <div className="w-20" />
           </CardHeader>
 
@@ -84,11 +107,42 @@ export default function CreateNewsPage() {
                 <Input
                   id="title"
                   value={title}
-                  onChange={(e) => setTitle(e.target.value)}
+                  onChange={(e) => {
+                    setTitle(e.target.value);
+                    if (e.target.value === "") userEditedSlug.current = false;
+                  }}
                   placeholder="Nhập tiêu đề tin tức"
                   className="text-lg font-medium"
                   required
                 />
+              </div>
+
+              {/* 📌 Slug */}
+              <div className="space-y-2">
+                <Label htmlFor="slug" className="text-sm font-medium text-slate-700">
+                  Slug (tự sinh, có thể chỉnh sửa)
+                </Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="slug"
+                    placeholder="slug-tu-dong"
+                    value={slug}
+                    onChange={handleSlugChange}
+                    required
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    title="Tạo lại slug từ tiêu đề"
+                    onClick={regenerateSlug}
+                  >
+                    <RefreshCcw className="h-4 w-4" />
+                  </Button>
+                </div>
+                <p className="text-xs text-gray-500">
+                  💡 Slug sẽ xuất hiện trong URL: <code>/news/{slug || "slug-tu-dong"}</code>
+                </p>
               </div>
 
               {/* Mô tả ngắn */}
@@ -107,7 +161,7 @@ export default function CreateNewsPage() {
                 />
               </div>
 
-              {/* Nội dung chính */}
+              {/* Nội dung */}
               <div className="space-y-2">
                 <Label htmlFor="content" className="text-sm font-medium text-slate-700">
                   Nội dung
@@ -123,7 +177,7 @@ export default function CreateNewsPage() {
                   type="submit"
                   disabled={saving}
                   size="lg"
-                  className=" from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+                  className="from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
                 >
                   {saving ? (
                     <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
