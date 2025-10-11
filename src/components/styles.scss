@@ -3,33 +3,6 @@
   overflow-y: auto;
   position: relative;
 }
-
-.tiptap {
-  width: 100%;
-  min-height: 300px;
-  background-color: #fff;
-  border: none;
-  border-radius: 8px;
-  outline: none;
-  padding: 1rem;
-
-  /* tránh ép margin/font của h1, p, ul... */
-  
-  /* image */
-  img {
-    display: block;
-    max-width: 100%;
-    height: auto;
-    margin: 1rem 0;
-
-    &.ProseMirror-selectednode { outline: 3px solid var(--purple); }
-  }
-
-  img[data-resizable][style*="text-align: left"] { margin-left: 0; margin-right: auto; }
-  img[data-resizable][style*="text-align: center"] { margin-left: auto; margin-right: auto; }
-  img[data-resizable][style*="text-align: right"] { margin-left: auto; margin-right: 0; }
-}
-
 /* Toolbar sticky */
 .control-group {
   position: sticky;
@@ -58,4 +31,75 @@
   &:hover { background-color: #f1f3f4; }
   &.is-active { background-color: #e8f0fe; color: #1967d2; }
   &:disabled { color: #c6c6c6; cursor: not-allowed; }
+}
+
+.tiptap {
+  width: 100%;
+  min-height: 300px;
+  background-color: #fff;
+  border: none;
+  border-radius: 8px;
+  outline: none;
+  padding: 1rem;
+
+  // QUAN TRỌNG: Preserve spaces
+  p, h1, h2, h3, h4, h5, h6 {
+    white-space: pre-wrap !important;
+  }
+  
+  /* image */
+  img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin: 1rem 0;
+
+    &.ProseMirror-selectednode { outline: 3px solid var(--purple); }
+  }
+  /* Styling cho headings */
+  h1 {
+    font-size: 2em;
+    font-weight: bold;
+    margin: 0.67em 0;
+    line-height: 1.2;
+  }
+
+  h2 {
+    font-size: 1.5em;
+    font-weight: bold;
+    margin: 0.75em 0;
+    line-height: 1.3;
+  }
+
+  h3 {
+    font-size: 1.17em;
+    font-weight: bold;
+    margin: 0.83em 0;
+    line-height: 1.4;
+  }
+
+  h4 {
+    font-size: 1em;
+    font-weight: bold;
+    margin: 1em 0;
+    line-height: 1.4;
+  }
+
+  h5 {
+    font-size: 0.83em;
+    font-weight: bold;
+    margin: 1.17em 0;
+    line-height: 1.5;
+  }
+
+  h6 {
+    font-size: 0.67em;
+    font-weight: bold;
+    margin: 1.33em 0;
+    line-height: 1.5;
+  }
+
+  img[data-resizable][style*="text-align: left"] { margin-left: 0; margin-right: auto; }
+  img[data-resizable][style*="text-align: center"] { margin-left: auto; margin-right: auto; }
+  img[data-resizable][style*="text-align: right"] { margin-left: auto; margin-right: 0; }
 }

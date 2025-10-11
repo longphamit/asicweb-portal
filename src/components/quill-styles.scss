@@ -1,0 +1,46 @@
+.quill-wrapper {
+  background: #fff;
+  border-radius: 8px;
+  overflow: hidden;
+
+  .ql-toolbar {
+    background: #f8f9fa;
+    border: 1px solid #e0e0e0;
+    border-bottom: 2px solid #e0e0e0;
+    border-radius: 8px 8px 0 0;
+    padding: 0.75rem;
+  }
+
+  .ql-container {
+    border: 1px solid #e0e0e0;
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    min-height: 300px;
+    max-height: 500px;
+    overflow-y: auto;
+    font-family: inherit;
+    font-size: 1rem;
+  }
+
+  .ql-editor {
+    min-height: 300px;
+    padding: 1.5rem;
+
+    // Headings tự động có style mặc định của browser
+    h1 { font-size: 2em; font-weight: bold; margin: 0.67em 0; }
+    h2 { font-size: 1.5em; font-weight: bold; margin: 0.75em 0; }
+    h3 { font-size: 1.17em; font-weight: bold; margin: 0.83em 0; }
+    h4 { font-size: 1em; font-weight: bold; margin: 1em 0; }
+    h5 { font-size: 0.83em; font-weight: bold; margin: 1.17em 0; }
+    h6 { font-size: 0.67em; font-weight: bold; margin: 1.33em 0; }
+
+    p { margin: 0.5em 0; line-height: 1.6; }
+    
+    img { max-width: 100%; height: auto; }
+  }
+
+  .ql-editor.ql-blank::before {
+    color: #adb5bd;
+    font-style: normal;
+  }
+}

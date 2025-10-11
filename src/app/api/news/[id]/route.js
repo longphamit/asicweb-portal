@@ -28,7 +28,7 @@ export async function PUT(req, { params }) {
     const body = await req.json();
     const db = await getDb();
     const result = await db.collection("content").updateOne(
-      { _id: new ObjectId(id) }, // ✅ convert id sang ObjectId
+      { _id: id }, // ✅ convert id sang ObjectId
       { $set: { ...body, updatedAt: new Date() } }
     );
 

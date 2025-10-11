@@ -54,6 +54,12 @@ export async function getDocumentById(collectionName, id) {
   return document;
 }
 
+export async function getDocumentBySlug(collectionName, slug) {
+  const db = await getDb();
+  const document = await db.collection(collectionName).findOne({ slug: slug });
+  return document;
+}
+
 // getAll
 export async function getAllDocuments(collectionName) {
   const db = await getDb();

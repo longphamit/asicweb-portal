@@ -3,26 +3,11 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import {
-  ArrowLeft,
-  Edit2,
-  Save,
-  X,
-  Calendar,
-  Clock,
-  User,
-  Upload,
-  EyeOff,
-} from "lucide-react";
-
-import Editor from "@/components/tiptap-editor";
+import { ArrowLeft, Calendar, Clock, User, Edit2 } from "lucide-react";
 
 export default function NewsDetailPage() {
   const router = useRouter();
@@ -31,13 +16,6 @@ export default function NewsDetailPage() {
 
   const [news, setNews] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [updatingStatus, setUpdatingStatus] = useState(false);
-
-  const [title, setTitle] = useState("");
-  const [shortDescription, setShortDescription] = useState("");
-  const [content, setContent] = useState("");
 
   const fetchNews = async () => {
     try {
@@ -46,9 +24,6 @@ export default function NewsDetailPage() {
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
       setNews(data);
-      setTitle(data.title);
-      setShortDescription(data.shortDescription);
-      setContent(data.content);
     } catch (err) {
       toast.error("Lỗi khi tải tin tức", { description: err.message });
     } finally {
@@ -60,94 +35,15 @@ export default function NewsDetailPage() {
     fetchNews();
   }, [id]);
 
-  const handleEditorUpdate = (html) => setContent(html);
-
-  const handleUpdate = async () => {
-    if (!title || !shortDescription || !content) {
-      toast.error("Vui lòng nhập đầy đủ tiêu đề, mô tả và nội dung");
-      return;
-    }
-    try {
-      setSaving(true);
-      const res = await fetch(`/api/news/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, shortDescription, content }),
-      });
-      if (!res.ok) throw new Error(await res.text());
-      toast.success("Cập nhật tin tức thành công!");
-      setEditing(false);
-      await fetchNews();
-    } catch (err) {
-      toast.error("Lỗi khi cập nhật tin tức", { description: err.message });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleTogglePublish = async () => {
-    if (!news) return;
-    try {
-      setUpdatingStatus(true);
-      const res = await fetch(`/api/news/${id}/update-publish`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ published: !news.published }),
-      });
-      if (!res.ok) throw new Error(await res.text());
-      toast.success(
-        !news.published ? "✅ Xuất bản thành công!" : "🗑️ Đã gỡ xuất bản!"
-      );
-      await fetchNews();
-    } catch (err) {
-      toast.error("Lỗi khi thay đổi trạng thái bài viết", {
-        description: err.message,
-      });
-    } finally {
-      setUpdatingStatus(false);
-    }
-  };
-
-  const handleCancel = () => {
-    setEditing(false);
-    if (news) {
-      setTitle(news.title);
-      setShortDescription(news.shortDescription);
-      setContent(news.content);
-    }
-  };
-
   if (loading) return <LoadingCard />;
   if (!news) return <NotFoundCard />;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
       <div className="container mx-auto px-4 py-8">
-        <HeaderSection
-          editing={editing}
-          handleCancel={handleCancel}
-          setEditing={setEditing}
-          id={id}
-          news={news}
-          onTogglePublish={handleTogglePublish}
-          updatingStatus={updatingStatus}
-        />
+        <HeaderSection id={id} news={news} />
         <div className="max-w-4xl mx-auto space-y-6">
-          {editing ? (
-            <EditCard
-              title={title}
-              setTitle={setTitle}
-              shortDescription={shortDescription}
-              setShortDescription={setShortDescription}
-              content={content}
-              handleEditorUpdate={handleEditorUpdate}
-              handleUpdate={handleUpdate}
-              handleCancel={handleCancel}
-              saving={saving}
-            />
-          ) : (
-            <ArticleView news={news} />
-          )}
+          <ArticleView news={news} />
         </div>
       </div>
     </div>
@@ -155,15 +51,7 @@ export default function NewsDetailPage() {
 }
 
 /* Header */
-function HeaderSection({
-  editing,
-  handleCancel,
-  setEditing,
-  id,
-  news,
-  onTogglePublish,
-  updatingStatus,
-}) {
+function HeaderSection({ id, news }) {
   const router = useRouter();
   return (
     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
@@ -199,44 +87,12 @@ function HeaderSection({
         )}
       </div>
       <div className="flex gap-2">
-        {!editing && (
-          <Button
-            size="sm"
-            variant={news?.published ? "destructive" : "default"}
-            onClick={onTogglePublish}
-            disabled={updatingStatus}
-            className={`text-white ${news?.published
-              ? "bg-red-600 hover:bg-red-700"
-              : "bg-green-600 hover:bg-green-700"
-            }`}
-          >
-            {updatingStatus ? (
-              <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
-            ) : news?.published ? (
-              <>
-                <EyeOff className="w-4 h-4 mr-2" /> Gỡ xuất bản
-              </>
-            ) : (
-              <>
-                <Upload className="w-4 h-4 mr-2" /> Xuất bản
-              </>
-            )}
-          </Button>
-        )}
         <Button
-          variant={editing ? "outline" : "default"}
+          variant="default"
           size="sm"
-          onClick={() => (editing ? handleCancel() : setEditing(true))}
+          onClick={() => router.push(`/dashboard/news/${id}/update`)}
         >
-          {editing ? (
-            <>
-              <X className="w-4 h-4 mr-2" /> Hủy
-            </>
-          ) : (
-            <>
-              <Edit2 className="w-4 h-4 mr-2" /> Chỉnh sửa
-            </>
-          )}
+          <Edit2 className="w-4 h-4 mr-2" /> Chỉnh sửa
         </Button>
       </div>
     </div>
@@ -281,87 +137,6 @@ function NotFoundCard() {
   );
 }
 
-/* Edit Mode Card */
-function EditCard({
-  title,
-  setTitle,
-  shortDescription,
-  setShortDescription,
-  content,
-  handleEditorUpdate,
-  handleUpdate,
-  handleCancel,
-  saving,
-}) {
-  return (
-    <Card className="shadow-lg bg-white/80 backdrop-blur-sm">
-      <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
-        <CardTitle className="flex items-center gap-2 text-slate-800">
-          <Edit2 className="w-5 h-5" /> Chỉnh sửa tin tức
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="p-6 flex flex-col gap-6">
-        {/* Title */}
-        <div className="space-y-2">
-          <Label htmlFor="title" className="text-sm font-medium text-slate-700">
-            Tiêu đề
-          </Label>
-          <Input
-            id="title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="text-lg font-medium"
-            placeholder="Nhập tiêu đề tin tức..."
-          />
-        </div>
-        {/* Short Description */}
-        <div className="space-y-2">
-          <Label
-            htmlFor="shortDescription"
-            className="text-sm font-medium text-slate-700"
-          >
-            Mô tả ngắn
-          </Label>
-          <Textarea
-            id="shortDescription"
-            value={shortDescription}
-            onChange={(e) => setShortDescription(e.target.value)}
-            rows={4}
-            className="resize-none"
-            placeholder="Nhập mô tả ngắn..."
-          />
-        </div>
-        {/* Content */}
-        <div className="space-y-2">
-          <Label
-            htmlFor="content"
-            className="text-sm font-medium text-slate-700"
-          >
-            Nội dung
-          </Label>
-          <div className="border rounded-lg bg-white min-h-[300px]">
-            <Editor initialContent={content} onUpdate={handleEditorUpdate} />
-          </div>
-        </div>
-        {/* Buttons */}
-        <div className="flex justify-end gap-3 mt-4">
-          <Button variant="outline" onClick={handleCancel} size="lg">
-            <X className="w-4 h-4 mr-2" /> Hủy
-          </Button>
-          <Button onClick={handleUpdate} disabled={saving} size="lg">
-            {saving ? (
-              <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
-            ) : (
-              <Save className="w-4 h-4 mr-2" />
-            )}
-            Lưu thay đổi
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
 /* View Mode Card */
 function ArticleView({ news }) {
   return (
@@ -399,7 +174,7 @@ function ArticleView({ news }) {
       </CardHeader>
       <CardContent className="p-8 space-y-6">
         {/* Short Description */}
-        <div className="bg-gradient-to-r">
+        <div>
           <p className="text-lg leading-relaxed text-slate-700 whitespace-pre-line font-medium">
             {news.shortDescription}
           </p>
@@ -408,7 +183,14 @@ function ArticleView({ news }) {
         {/* Content */}
         <div className="prose prose-slate max-w-none lg:prose-lg">
           <div
-            className="leading-relaxed"
+            className="leading-relaxed 
+              [&_h1]:text-3xl [&_h1]:font-bold [&_h1]:mt-6 [&_h1]:mb-4 [&_h1]:text-slate-800
+              [&_h2]:text-2xl [&_h2]:font-semibold [&_h2]:mt-5 [&_h2]:mb-3 [&_h2]:text-slate-700
+              [&_h3]:text-xl [&_h3]:font-medium [&_h3]:mt-4 [&_h3]:mb-2 [&_h3]:text-slate-600
+              [&_blockquote]:border-l-4 [&_blockquote]:border-slate-300 [&_blockquote]:pl-4 [&_blockquote]:my-4 [&_blockquote]:text-slate-600 [&_blockquote]:italic
+              [&_a]:!text-[#0768ea] [&_a]:hover:!text-[#0557c2] [&_a]:transition-colors [&_a]:!bg-transparent
+              [&_img]:max-w-full [&_img]:h-auto [&_img]:my-4 [&_img]:rounded-md
+              [&_video]:max-w-full [&_video]:h-auto [&_video]:my-4 [&_video]:rounded-md"
             dangerouslySetInnerHTML={{ __html: news.content }}
           />
         </div>

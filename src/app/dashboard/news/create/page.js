@@ -9,8 +9,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { ArrowLeft, Save, RefreshCcw } from "lucide-react";
+import dynamic from "next/dynamic";
 
-import Editor from "@/components/tiptap-editor";
+// Import Quill dynamically để tránh SSR issues
+const QuillEditor = dynamic(() => import("@/components/quill-editor"), {
+  ssr: false,
+  loading: () => <div className="p-4 text-center text-gray-500">Đang tải editor...</div>
+});
 
 // 🌀 Hàm tạo slug chuẩn SEO
 const slugify = (text) =>
@@ -166,8 +171,8 @@ export default function CreateNewsPage() {
                 <Label htmlFor="content" className="text-sm font-medium text-slate-700">
                   Nội dung
                 </Label>
-                <div className="border rounded-lg bg-white min-h-[300px]">
-                  <Editor initialContent={content} onUpdate={handleEditorUpdate} />
+                <div className="border rounded-lg bg-white overflow-hidden">
+                  <QuillEditor initialContent={content} onUpdate={handleEditorUpdate} />
                 </div>
               </div>
 
