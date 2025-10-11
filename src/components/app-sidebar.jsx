@@ -1,6 +1,8 @@
+// components/app-sidebar.jsx
 "use client";
 
 import * as React from "react";
+import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import {
@@ -10,7 +12,7 @@ import {
   IconFolder,
   IconDatabase,
   IconInnerShadowTop,
-  IconBook, // 📚 icon cho Courses
+  IconBook,
 } from "@tabler/icons-react";
 import { NavDocuments } from "@/components/nav-documents";
 import { NavSecondary } from "@/components/nav-secondary";
@@ -26,18 +28,97 @@ import {
 } from "@/components/ui/sidebar";
 
 function NavMain({ items }) {
+  const pathname = usePathname();
+
   return (
     <SidebarMenu>
-      {items.map((item) => (
-        <SidebarMenuItem key={item.title}>
-          <SidebarMenuButton asChild>
-            <Link href={item.url} className="flex items-center gap-2">
-              <item.icon className="size-5" />
-              <span>{item.title}</span>
-            </Link>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
-      ))}
+      {items.map((item) => {
+        // Logic isActive: Xử lý riêng cho /dashboard
+        const isActive =
+          item.url === "/dashboard"
+            ? pathname === "/dashboard" // Chỉ highlight khi exact match /dashboard
+            : pathname === item.url ||
+              (pathname.startsWith(`${item.url}/`) &&
+                pathname.split("/").length === item.url.split("/").length + 1);
+
+        return (
+          <SidebarMenuItem key={item.title}>
+            <SidebarMenuButton
+              asChild
+              isActive={isActive}
+              tooltip={item.title}
+              variant="custom"
+            >
+              <Link href={item.url} className="flex items-center gap-2">
+                <item.icon className="size-5" />
+                <span>{item.title}</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        );
+      })}
+    </SidebarMenu>
+  );
+}
+
+function NavDocumentsWithHighlight({ items }) {
+  const pathname = usePathname();
+
+  return (
+    <SidebarMenu>
+      {items.map((item) => {
+        const isActive =
+          pathname === item.url ||
+          (pathname.startsWith(`${item.url}/`) &&
+            pathname.split("/").length === item.url.split("/").length + 1);
+
+        return (
+          <SidebarMenuItem key={item.name}>
+            <SidebarMenuButton
+              asChild
+              isActive={isActive}
+              tooltip={item.name}
+              variant="custom"
+            >
+              <Link href={item.url} className="flex items-center gap-2">
+                <item.icon className="size-5" />
+                <span>{item.name}</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        );
+      })}
+    </SidebarMenu>
+  );
+}
+
+function NavSecondaryWithHighlight({ items, className }) {
+  const pathname = usePathname();
+
+  return (
+    <SidebarMenu className={className}>
+      {items.map((item) => {
+        const isActive =
+          pathname === item.url ||
+          (pathname.startsWith(`${item.url}/`) &&
+            pathname.split("/").length === item.url.split("/").length + 1);
+
+        return (
+          <SidebarMenuItem key={item.title}>
+            <SidebarMenuButton
+              asChild
+              isActive={isActive}
+              tooltip={item.title}
+              variant="custom"
+            >
+              <Link href={item.url} className="flex items-center gap-2">
+                <item.icon className="size-5" />
+                <span>{item.title}</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        );
+      })}
     </SidebarMenu>
   );
 }
@@ -51,13 +132,12 @@ export function AppSidebar({ ...props }) {
     avatar: party?.avatar || "/avatars/shadcn.jpg",
   };
 
-  // ✅ Thêm Courses vào menu chính
   const navMain = [
     { title: "Dashboard", url: "/dashboard", icon: IconDashboard },
     { title: "Profile", url: "/dashboard/parties", icon: IconListDetails },
     { title: "News", url: "/dashboard/news", icon: IconChartBar },
     { title: "Publications", url: "/dashboard/publications", icon: IconFolder },
-    { title: "Courses", url: "/dashboard/courses", icon: IconBook }, // 📚 Courses mới thêm
+    { title: "Courses", url: "/dashboard/courses", icon: IconBook },
   ];
 
   const documents = [
@@ -84,8 +164,8 @@ export function AppSidebar({ ...props }) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={navMain} />
-        <NavDocuments items={documents} />
-        <NavSecondary items={navSecondary} className="mt-auto" />
+        <NavDocumentsWithHighlight items={documents} />
+        <NavSecondaryWithHighlight items={navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={user} />
