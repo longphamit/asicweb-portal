@@ -3,9 +3,9 @@ import { getFileById } from "../../../../lib/controller/fileController";
 import fs from "fs/promises";
 import path from "path";
 
-export async function GET(req, { params }) {
+export async function GET(req, context) {
   try {
-    const fileId = params.id;
+    const fileId = await context.params.id;
     const file = await getFileById(fileId);
 
     if (!file) {

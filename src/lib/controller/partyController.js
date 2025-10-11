@@ -83,3 +83,20 @@ export async function updatePartyAccountStatus(partyId, haveAccount) {
 
   return result.modifiedCount > 0;
 }
+
+export async function updateImage(partyId, image) {
+  const db = await getDb();
+
+  const result = await db.collection(COLLECTION_NAME).updateOne(
+    { _id: partyId },
+    {
+      $set: {
+        image,
+        updatedAt: new Date(),
+      },
+    }
+  );
+
+  return result.modifiedCount > 0;
+}
+

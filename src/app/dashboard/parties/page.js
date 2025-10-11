@@ -37,6 +37,7 @@ export default function ProfilePage() {
   const [profiles, setProfiles] = useState([]);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
+  const [isAvatarOpen, setIsAvatarOpen] = useState(false);
   const [selectedProfile, setSelectedProfile] = useState(null);
   const [formData, setFormData] = useState({
     name: "",
@@ -51,6 +52,7 @@ export default function ProfilePage() {
     username: "",
     password: "",
   });
+  const [avatarData, setAvatarData] = useState({ image: null });
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [previewImage, setPreviewImage] = useState(null);
@@ -67,7 +69,7 @@ export default function ProfilePage() {
           ...p,
           _id: p._id?.toString?.() || p._id,
           accountId: p.accountId || null,
-          image: p.image || null, // Lưu image là ID
+          image: p.image || null,
         }))
       );
     } catch (e) {
@@ -82,15 +84,28 @@ export default function ProfilePage() {
     fetchProfiles();
   }, []);
 
-  // 📌 Xử lý upload hình ảnh
+  // 📌 Xử lý upload hình ảnh (tạo hồ sơ)
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) { // Giới hạn 5MB
+      if (file.size > 5 * 1024 * 1024) {
         toast.error("Hình ảnh quá lớn", { description: "Vui lòng chọn hình ảnh dưới 5MB" });
         return;
       }
       setFormData({ ...formData, image: file });
+      setPreviewImage(URL.createObjectURL(file));
+    }
+  };
+
+  // 📌 Xử lý upload avatar
+  const handleAvatarChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error("Hình ảnh quá lớn", { description: "Vui lòng chọn hình ảnh dưới 5MB" });
+        return;
+      }
+      setAvatarData({ image: file });
       setPreviewImage(URL.createObjectURL(file));
     }
   };
@@ -134,11 +149,72 @@ export default function ProfilePage() {
     }
   };
 
+  // 📌 Cập nhật avatar
+  const handleUpdateAvatar = async (e) => {
+    e.preventDefault();
+    try {
+      const formDataToSend = new FormData();
+      if (avatarData.image) {
+        formDataToSend.append("image", avatarData.image);
+      } else {
+        throw new Error("Vui lòng chọn hình ảnh");
+      }
+
+      const res = await fetch(`/api/parties/${selectedProfile._id}/image`, {
+        method: "PATCH",
+        body: formDataToSend,
+      });
+      if (!res.ok) throw new Error(await res.text());
+      toast.success("Cập nhật avatar thành công!", { description: `Avatar của ${selectedProfile.name} đã được cập nhật.` });
+      setIsAvatarOpen(false);
+      setAvatarData({ image: null });
+      setPreviewImage(null);
+      setSelectedProfile(null);
+      await fetchProfiles();
+    } catch (err) {
+      setError(err.message);
+      toast.error("Lỗi khi cập nhật avatar", { description: err.message });
+    }
+  };
+
+  // 📌 Xóa hồ sơ
+  const handleDeleteParty = async (profile) => {
+    try {
+      // Nếu có tài khoản liên kết, xóa tài khoản trước
+      if (profile.accountId) {
+        const resDeleteAccount = await fetch(`/api/accounts/${profile.accountId}`, {
+          method: "DELETE",
+        });
+        if (!resDeleteAccount.ok) throw new Error(await resDeleteAccount.text());
+      }
+
+      // Xóa party
+      const res = await fetch(`/api/parties/${profile._id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error(await res.text());
+
+      toast.success("Xóa hồ sơ thành công!", { description: `Hồ sơ của ${profile.name} đã được xóa.` });
+      await fetchProfiles();
+    } catch (err) {
+      setError(err.message);
+      toast.error("Lỗi khi xóa hồ sơ", { description: err.message });
+    }
+  };
+
   // 📌 Mở dialog cấp tài khoản
   const handleOpenAccountDialog = (profile) => {
     setSelectedProfile(profile);
     setAccountData({ username: profile.account?.username || "", password: "" });
     setIsAccountOpen(true);
+  };
+
+  // 📌 Mở dialog upload avatar
+  const handleOpenAvatarDialog = (profile) => {
+    setSelectedProfile(profile);
+    setAvatarData({ image: null });
+    setPreviewImage(null);
+    setIsAvatarOpen(true);
   };
 
   // 📌 Cấp tài khoản
@@ -278,6 +354,7 @@ export default function ProfilePage() {
                             width={100}
                             height={100}
                             className="object-cover rounded"
+                            unoptimized
                           />
                         </div>
                       )}
@@ -377,6 +454,7 @@ export default function ProfilePage() {
                           width={50}
                           height={50}
                           className="object-cover rounded"
+                          unoptimized
                         />
                       ) : (
                         <div className="w-[50px] h-[50px] bg-gray-200 rounded flex items-center justify-center">
@@ -403,6 +481,17 @@ export default function ProfilePage() {
                           <Button variant="ghost" size="icon">•••</Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleOpenAvatarDialog(p)}>
+                            Upload Avatar
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <ConfirmDialog
+                              trigger={<Button variant="ghost" className="w-full text-left p-0">Xóa hồ sơ</Button>}
+                              title="Xác nhận xóa hồ sơ"
+                              description={`Bạn có chắc muốn xóa hồ sơ của ${p.name}? Hành động này không thể hoàn tác.`}
+                              onConfirm={() => handleDeleteParty(p)}
+                            />
+                          </DropdownMenuItem>
                           {!p.accountId && (
                             <DropdownMenuItem onClick={() => handleOpenAccountDialog(p)}>
                               Cấp tài khoản
@@ -468,6 +557,54 @@ export default function ProfilePage() {
             <DialogFooter>
               <Button variant="outline" type="button" onClick={() => setIsAccountOpen(false)}>Hủy</Button>
               <Button type="submit">Tạo</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog upload avatar */}
+      <Dialog open={isAvatarOpen} onOpenChange={setIsAvatarOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Upload Avatar</DialogTitle>
+            <DialogDescription>
+              Chọn hình ảnh cho <span className="font-semibold">{selectedProfile?.name}</span>
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleUpdateAvatar}>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="avatar" className="text-right">Hình ảnh</Label>
+                <div className="col-span-3">
+                  <Input
+                    id="avatar"
+                    type="file"
+                    accept="image/*"
+                    className="col-span-3"
+                    onChange={handleAvatarChange}
+                  />
+                  {previewImage && (
+                    <div className="mt-2">
+                      <Image
+                        src={previewImage}
+                        alt="Preview"
+                        width={100}
+                        height={100}
+                        className="object-cover rounded"
+                        unoptimized
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" type="button" onClick={() => {
+                setIsAvatarOpen(false);
+                setPreviewImage(null);
+                setAvatarData({ image: null });
+              }}>Hủy</Button>
+              <Button type="submit">Lưu</Button>
             </DialogFooter>
           </form>
         </DialogContent>
