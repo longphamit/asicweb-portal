@@ -19,6 +19,7 @@ export const contentController = {
       const total = await db.collection(COLLECTION_NAME).countDocuments({});
 
       console.log("Fetching contents...");
+
       const contents = await db
         .collection(COLLECTION_NAME)
         .find({})

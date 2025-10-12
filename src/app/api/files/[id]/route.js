@@ -5,7 +5,8 @@ import path from "path";
 
 export async function GET(req, context) {
   try {
-    const fileId = await context.params.id;
+    const params = await context.params;
+    const fileId = params.id;
     const file = await getFileById(fileId);
 
     if (!file) {

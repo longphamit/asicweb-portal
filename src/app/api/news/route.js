@@ -4,8 +4,9 @@ import { contentController }  from '../../../lib/controller/contentController';
 
 export async function GET(req) {
   try {
-    // 🔍 Lấy query params từ URL
+    // 🔍 Lấy query params từ URL   published
     const { searchParams } = new URL(req.url);
+   
     const page = parseInt(searchParams.get("page")) || 1;
     const limit = parseInt(searchParams.get("limit")) || 10;
 

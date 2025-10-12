@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { ArrowLeft, Save, RefreshCcw } from "lucide-react";
+import { ArrowLeft, Save, RefreshCcw, Upload, X, Image as ImageIcon } from "lucide-react";
 import dynamic from "next/dynamic";
 
 // Import Quill dynamically để tránh SSR issues
@@ -35,8 +35,12 @@ export default function CreateNewsPage() {
   const [slug, setSlug] = useState("");
   const [shortDescription, setShortDescription] = useState("");
   const [content, setContent] = useState("");
+  const [thumbnail, setThumbnail] = useState(null);
+  const [thumbnailPreview, setThumbnailPreview] = useState("");
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const userEditedSlug = useRef(false);
+  const fileInputRef = useRef(null);
 
   // ✅ Tự tạo slug khi title thay đổi nếu user chưa chỉnh tay
   useEffect(() => {
@@ -57,6 +61,42 @@ export default function CreateNewsPage() {
     userEditedSlug.current = false;
   };
 
+  // 📸 Handle thumbnail upload
+  const handleThumbnailChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error("Vui lòng chọn file ảnh");
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Kích thước ảnh không được vượt quá 5MB");
+      return;
+    }
+
+    setThumbnail(file);
+    
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setThumbnailPreview(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // 🗑️ Remove thumbnail
+  const removeThumbnail = () => {
+    setThumbnail(null);
+    setThumbnailPreview("");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -67,10 +107,38 @@ export default function CreateNewsPage() {
 
     try {
       setSaving(true);
+      let thumbnailUrl = "";
+
+      // Upload thumbnail if exists
+      if (thumbnail) {
+        setUploading(true);
+        const formData = new FormData();
+        formData.append("file", thumbnail);
+
+        const uploadRes = await fetch("/api/files", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!uploadRes.ok) throw new Error("Lỗi khi upload ảnh");
+        
+        const uploadData = await uploadRes.json();
+        // Tạo thumbnail URL từ fileId
+        thumbnailUrl = `/api/files/${uploadData.fileId}`;
+        setUploading(false);
+      }
+
+      // Create news
       const res = await fetch("/api/news", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, slug, shortDescription, content }),
+        body: JSON.stringify({ 
+          title, 
+          slug, 
+          shortDescription, 
+          content,
+          thumbnail: thumbnailUrl 
+        }),
       });
 
       if (!res.ok) throw new Error(await res.text());
@@ -81,6 +149,7 @@ export default function CreateNewsPage() {
       toast.error("Lỗi khi tạo tin tức", { description: err.message });
     } finally {
       setSaving(false);
+      setUploading(false);
     }
   };
 
@@ -150,6 +219,70 @@ export default function CreateNewsPage() {
                 </p>
               </div>
 
+              {/* 📸 Thumbnail Upload */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-slate-700">
+                  Ảnh đại diện (Thumbnail)
+                </Label>
+                
+                {!thumbnailPreview ? (
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-primary transition-colors">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleThumbnailChange}
+                      className="hidden"
+                      id="thumbnail-upload"
+                    />
+                    <label 
+                      htmlFor="thumbnail-upload" 
+                      className="cursor-pointer flex flex-col items-center gap-3"
+                    >
+                      <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
+                        <Upload className="w-8 h-8 text-gray-400" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-700">
+                          Click để tải ảnh lên
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          PNG, JPG, GIF tối đa 5MB
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+                ) : (
+                  <div className="relative border rounded-lg overflow-hidden group">
+                    <img 
+                      src={thumbnailPreview} 
+                      alt="Thumbnail preview" 
+                      className="w-full h-64 object-cover"
+                    />
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        onClick={removeThumbnail}
+                        className="gap-2"
+                      >
+                        <X className="w-4 h-4" />
+                        Xóa ảnh
+                      </Button>
+                    </div>
+                    {uploading && (
+                      <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
+                        <div className="text-center text-white">
+                          <div className="animate-spin rounded-full h-12 w-12 border-4 border-white border-t-transparent mx-auto mb-2"></div>
+                          <p className="text-sm">Đang tải ảnh lên...</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
               {/* Mô tả ngắn */}
               <div className="space-y-2">
                 <Label htmlFor="shortDescription" className="text-sm font-medium text-slate-700">
@@ -180,16 +313,21 @@ export default function CreateNewsPage() {
               <div className="flex justify-end gap-3 mt-4">
                 <Button
                   type="submit"
-                  disabled={saving}
+                  disabled={saving || uploading}
                   size="lg"
                   className="from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
                 >
-                  {saving ? (
-                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
+                  {(saving || uploading) ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
+                      {uploading ? "Đang tải ảnh..." : "Đang lưu..."}
+                    </>
                   ) : (
-                    <Save className="w-4 h-4 mr-2" />
+                    <>
+                      <Save className="w-4 h-4 mr-2" />
+                      Lưu tin tức
+                    </>
                   )}
-                  Lưu tin tức
                 </Button>
               </div>
             </form>

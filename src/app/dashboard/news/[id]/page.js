@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ArrowLeft, Calendar, Clock, User, Edit2 } from "lucide-react";
+import { ArrowLeft, Calendar, Clock, User, Edit2, X } from "lucide-react";
+import Image from "next/image";
 
 export default function NewsDetailPage() {
   const router = useRouter();
@@ -53,6 +54,34 @@ export default function NewsDetailPage() {
 /* Header */
 function HeaderSection({ id, news }) {
   const router = useRouter();
+  const [publishing, setPublishing] = useState(false);
+
+  const handleTogglePublish = async () => {
+    try {
+      setPublishing(true);
+      const res = await fetch(`/api/news/${id}/update-publish`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ published: !news.published }),
+      });
+
+      if (!res.ok) throw new Error(await res.text());
+
+      toast.success(
+        news.published 
+          ? "Đã hủy xuất bản tin tức" 
+          : "Đã xuất bản tin tức thành công!"
+      );
+      
+      // Reload page to get updated data
+      window.location.reload();
+    } catch (err) {
+      toast.error("Lỗi khi cập nhật trạng thái", { description: err.message });
+    } finally {
+      setPublishing(false);
+    }
+  };
+
   return (
     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
       <div className="flex items-center gap-3">
@@ -87,6 +116,24 @@ function HeaderSection({ id, news }) {
         )}
       </div>
       <div className="flex gap-2">
+        <Button
+          variant={news?.published ? "outline" : "default"}
+          size="sm"
+          onClick={handleTogglePublish}
+          disabled={publishing}
+          className={news?.published ? "" : "bg-green-600 hover:bg-green-700"}
+        >
+          {publishing ? (
+            <>
+              <div className="animate-spin rounded-full h-3 w-3 border-2 border-current border-t-transparent mr-2"></div>
+              Đang xử lý...
+            </>
+          ) : news?.published ? (
+            <>Hủy xuất bản</>
+          ) : (
+            <>📢 Xuất bản</>
+          )}
+        </Button>
         <Button
           variant="default"
           size="sm"
@@ -139,8 +186,24 @@ function NotFoundCard() {
 
 /* View Mode Card */
 function ArticleView({ news }) {
+  const [imageError, setImageError] = useState(false);
+
   return (
     <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-sm overflow-hidden">
+      {/* Featured Image - Full Width */}
+      {news.thumbnail && !imageError && (
+        <div className="relative w-full h-[400px] lg:h-[500px] bg-gradient-to-br from-slate-100 to-slate-50">
+          <img
+            src={news.thumbnail}
+            alt={news.title}
+            className="w-full h-full object-cover"
+            onError={() => setImageError(true)}
+          />
+          {/* Gradient Overlay */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent"></div>
+        </div>
+      )}
+
       <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 border-b p-8">
         <div className="space-y-4">
           <CardTitle className="text-3xl lg:text-4xl font-bold text-slate-800 leading-tight">
@@ -172,14 +235,17 @@ function ArticleView({ news }) {
           </div>
         </div>
       </CardHeader>
+      
       <CardContent className="p-8 space-y-6">
         {/* Short Description */}
-        <div>
+        <div className="bg-slate-50 border-l-4 border-blue-500 p-6 rounded-r-lg">
           <p className="text-lg leading-relaxed text-slate-700 whitespace-pre-line font-medium">
             {news.shortDescription}
           </p>
         </div>
+        
         <Separator />
+        
         {/* Content */}
         <div className="prose prose-slate max-w-none lg:prose-lg">
           <div
@@ -189,7 +255,7 @@ function ArticleView({ news }) {
               [&_h3]:text-xl [&_h3]:font-medium [&_h3]:mt-4 [&_h3]:mb-2 [&_h3]:text-slate-600
               [&_blockquote]:border-l-4 [&_blockquote]:border-slate-300 [&_blockquote]:pl-4 [&_blockquote]:my-4 [&_blockquote]:text-slate-600 [&_blockquote]:italic
               [&_a]:!text-[#0768ea] [&_a]:hover:!text-[#0557c2] [&_a]:transition-colors [&_a]:!bg-transparent
-              [&_img]:max-w-full [&_img]:h-auto [&_img]:my-4 [&_img]:rounded-md
+              [&_img]:max-w-full [&_img]:h-auto [&_img]:my-4 [&_img]:rounded-md [&_img]:shadow-lg
               [&_video]:max-w-full [&_video]:h-auto [&_video]:my-4 [&_video]:rounded-md"
             dangerouslySetInnerHTML={{ __html: news.content }}
           />
