@@ -7,17 +7,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ArrowLeft, Save, RefreshCcw, Upload, X, Image as ImageIcon } from "lucide-react";
+import { ArrowLeft, Save, RefreshCcw, Upload, X, Edit2, Tag, Plus } from "lucide-react";
 import dynamic from "next/dynamic";
 
-// Import Quill dynamically để tránh SSR issues
 const QuillEditor = dynamic(() => import("@/components/quill-editor"), {
   ssr: false,
   loading: () => <div className="p-4 text-center text-gray-500">Đang tải editor...</div>
 });
 
-// 🌀 Hàm tạo slug chuẩn SEO
 const slugify = (text) =>
   text
     .toLowerCase()
@@ -39,15 +39,50 @@ export default function CreateNewsPage() {
   const [thumbnailPreview, setThumbnailPreview] = useState("");
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  
+  const [allTags, setAllTags] = useState([]);
+  const [selectedTags, setSelectedTags] = useState([]);
+  const [tagsLoading, setTagsLoading] = useState(false);
+  const [showTagDropdown, setShowTagDropdown] = useState(false);
+  const [tagSearch, setTagSearch] = useState("");
+  
   const userEditedSlug = useRef(false);
   const fileInputRef = useRef(null);
+  const tagDropdownRef = useRef(null);
 
-  // ✅ Tự tạo slug khi title thay đổi nếu user chưa chỉnh tay
+  const fetchAllTags = async () => {
+    try {
+      setTagsLoading(true);
+      const res = await fetch("/api/tags?limit=100");
+      if (!res.ok) throw new Error("Không thể tải tags");
+      const data = await res.json();
+      setAllTags(data);
+    } catch (err) {
+      toast.error("Lỗi khi tải tags", { description: err.message });
+    } finally {
+      setTagsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAllTags();
+  }, []);
+
   useEffect(() => {
     if (!userEditedSlug.current) {
       setSlug(slugify(title));
     }
   }, [title]);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (tagDropdownRef.current && !tagDropdownRef.current.contains(e.target)) {
+        setShowTagDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const handleEditorUpdate = (html) => setContent(html);
 
@@ -61,18 +96,15 @@ export default function CreateNewsPage() {
     userEditedSlug.current = false;
   };
 
-  // 📸 Handle thumbnail upload
   const handleThumbnailChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Validate file type
     if (!file.type.startsWith('image/')) {
       toast.error("Vui lòng chọn file ảnh");
       return;
     }
 
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast.error("Kích thước ảnh không được vượt quá 5MB");
       return;
@@ -80,7 +112,6 @@ export default function CreateNewsPage() {
 
     setThumbnail(file);
     
-    // Create preview
     const reader = new FileReader();
     reader.onloadend = () => {
       setThumbnailPreview(reader.result);
@@ -88,12 +119,96 @@ export default function CreateNewsPage() {
     reader.readAsDataURL(file);
   };
 
-  // 🗑️ Remove thumbnail
   const removeThumbnail = () => {
     setThumbnail(null);
     setThumbnailPreview("");
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
+    }
+  };
+
+  const toggleTag = (tagId) => {
+    setSelectedTags(prev => {
+      if (prev.includes(tagId)) {
+        return prev.filter(t => t !== tagId);
+      } else {
+        return [...prev, tagId];
+      }
+    });
+  };
+
+  const removeTag = (tagId) => {
+    setSelectedTags(prev => prev.filter(t => t !== tagId));
+  };
+
+  const createNewTag = async () => {
+    if (!tagSearch.trim()) {
+      toast.error("Vui lòng nhập tên tag");
+      return;
+    }
+
+    const existingTag = allTags.find(
+      t => t.name.toLowerCase() === tagSearch.toLowerCase()
+    );
+    if (existingTag) {
+      toast.error("Tag này đã tồn tại");
+      return;
+    }
+
+    try {
+      setTagsLoading(true);
+      const res = await fetch("/api/tags", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          name: tagSearch.trim(),
+        })
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Không thể tạo tag");
+      }
+
+      const newTag = await res.json();
+      
+      setAllTags(prev => [...prev, newTag]);
+      setSelectedTags(prev => [...prev, newTag._id]);
+      setTagSearch("");
+      setShowTagDropdown(false);
+      
+      toast.success(`Tag "${newTag.name}" đã được tạo`);
+    } catch (err) {
+      toast.error("Lỗi khi tạo tag", { description: err.message });
+    } finally {
+      setTagsLoading(false);
+    }
+  };
+
+  const filteredTags = allTags.filter(tag => 
+    tag.name.toLowerCase().includes(tagSearch.toLowerCase()) ||
+    tag._id.toLowerCase().includes(tagSearch.toLowerCase())
+  );
+
+  const hasExactMatch = filteredTags.some(
+    tag => tag.name.toLowerCase() === tagSearch.toLowerCase()
+  );
+
+  const addTagsToNews = async (newsId) => {
+    for (const tagId of selectedTags) {
+      try {
+        await fetch("/api/tags?action=add", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            tagId,
+            type: "news",
+            referId: newsId
+          })
+        });
+      } catch (err) {
+        console.error(`Error adding tag ${tagId}:`, err);
+      }
     }
   };
 
@@ -109,7 +224,6 @@ export default function CreateNewsPage() {
       setSaving(true);
       let thumbnailUrl = "";
 
-      // Upload thumbnail if exists
       if (thumbnail) {
         setUploading(true);
         const formData = new FormData();
@@ -123,12 +237,10 @@ export default function CreateNewsPage() {
         if (!uploadRes.ok) throw new Error("Lỗi khi upload ảnh");
         
         const uploadData = await uploadRes.json();
-        // Tạo thumbnail URL từ fileId
         thumbnailUrl = `/api/files/${uploadData.fileId}`;
         setUploading(false);
       }
 
-      // Create news
       const res = await fetch("/api/news", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -137,11 +249,19 @@ export default function CreateNewsPage() {
           slug, 
           shortDescription, 
           content,
-          thumbnail: thumbnailUrl 
+          thumbnail: thumbnailUrl,
+          tags: selectedTags
         }),
       });
 
       if (!res.ok) throw new Error(await res.text());
+
+      const newNews = await res.json();
+      
+      // Add tags to tag collection
+      if (selectedTags.length > 0) {
+        await addTagsToNews(newNews._id);
+      }
 
       toast.success("Tạo tin tức thành công!");
       router.push("/dashboard/news");
@@ -153,187 +273,343 @@ export default function CreateNewsPage() {
     }
   };
 
+  const handleCancel = () => {
+    router.push("/dashboard/news");
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 py-8">
-      <div className="container mx-auto px-4">
-        <Card className="max-w-4xl mx-auto shadow-xl bg-white/90 backdrop-blur-sm">
-          {/* Header */}
-          <CardHeader className="bg-gradient-to-r border-b p-6 flex justify-between items-center">
-            <Button variant="outline" size="sm" onClick={() => router.push("/dashboard/news")}>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push("/dashboard/news")}
+            >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Quay về
             </Button>
+            <Separator orientation="vertical" className="h-6" />
+            <Badge variant="secondary">Tạo tin tức mới</Badge>
+          </div>
 
-            <CardTitle className="text-2xl font-bold text-slate-800">
-              Tạo tin tức mới
-            </CardTitle>
+          {/* Action Buttons */}
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={handleCancel}
+              size="sm"
+            >
+              <X className="w-4 h-4 mr-2" /> Hủy
+            </Button>
+            <Button 
+              onClick={handleSubmit} 
+              disabled={saving || uploading}
+              size="sm"
+            >
+              {(saving || uploading) ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
+                  {uploading ? "Đang tải..." : "Đang lưu..."}
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  Tạo tin tức
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
 
-            <div className="w-20" />
-          </CardHeader>
-
-          <CardContent className="p-6 space-y-6">
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Tiêu đề */}
-              <div className="space-y-2">
-                <Label htmlFor="title" className="text-sm font-medium text-slate-700">
-                  Tiêu đề
-                </Label>
-                <Input
-                  id="title"
-                  value={title}
-                  onChange={(e) => {
-                    setTitle(e.target.value);
-                    if (e.target.value === "") userEditedSlug.current = false;
-                  }}
-                  placeholder="Nhập tiêu đề tin tức"
-                  className="text-lg font-medium"
-                  required
-                />
-              </div>
-
-              {/* 📌 Slug */}
-              <div className="space-y-2">
-                <Label htmlFor="slug" className="text-sm font-medium text-slate-700">
-                  Slug (tự sinh, có thể chỉnh sửa)
-                </Label>
-                <div className="flex items-center gap-2">
+        {/* Two Column Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 max-w-7xl mx-auto">
+          {/* LEFT COLUMN - Main Content */}
+          <div className="lg:col-span-2 space-y-6">
+            <Card className="shadow-lg">
+              <CardHeader className="bg-gradient-to-r">
+                <CardTitle className="flex items-center gap-2">
+                  <Edit2 className="w-5 h-5" /> Nội dung chính
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Title */}
+                <div className="space-y-2">
+                  <Label htmlFor="title">Tiêu đề</Label>
                   <Input
-                    id="slug"
-                    placeholder="slug-tu-dong"
+                    id="title"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    className="text-lg font-medium"
+                    placeholder="Nhập tiêu đề tin tức..."
+                    required
+                  />
+                </div>
+
+                {/* Short Description */}
+                <div className="space-y-2">
+                  <Label htmlFor="shortDescription">Mô tả ngắn</Label>
+                  <Textarea
+                    id="shortDescription"
+                    value={shortDescription}
+                    onChange={(e) => setShortDescription(e.target.value)}
+                    rows={4}
+                    placeholder="Nhập mô tả ngắn..."
+                    required
+                  />
+                </div>
+
+                {/* Content */}
+                <div className="space-y-2">
+                  <Label htmlFor="content">Nội dung</Label>
+                  <div className="border rounded-lg overflow-hidden">
+                    <QuillEditor initialContent={content} onUpdate={handleEditorUpdate} />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* RIGHT COLUMN - Sidebar */}
+          <div className="space-y-6">
+            {/* Thumbnail Card */}
+            <Card className="shadow-lg">
+              <CardHeader className="bg-gradient-to-r">
+                <CardTitle className="text-base flex items-center">
+                  <Upload className="w-4 h-4" /> Ảnh đại diện
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="">
+                <ThumbnailUpload
+                  thumbnail={thumbnail}
+                  thumbnailPreview={thumbnailPreview}
+                  handleThumbnailChange={handleThumbnailChange}
+                  removeThumbnail={removeThumbnail}
+                  fileInputRef={fileInputRef}
+                  uploading={uploading}
+                />
+              </CardContent>
+            </Card>
+
+            {/* Tags Card */}
+            <Card className="shadow-lg">
+              <CardHeader className="bg-gradient-to-r">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Tag className="w-4 h-4" /> Tags
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <TagsSection
+                  allTags={allTags}
+                  selectedTags={selectedTags}
+                  removeTag={removeTag}
+                  toggleTag={toggleTag}
+                  createNewTag={createNewTag}
+                  tagsLoading={tagsLoading}
+                  showTagDropdown={showTagDropdown}
+                  setShowTagDropdown={setShowTagDropdown}
+                  tagSearch={tagSearch}
+                  setTagSearch={setTagSearch}
+                  filteredTags={filteredTags}
+                  hasExactMatch={hasExactMatch}
+                  tagDropdownRef={tagDropdownRef}
+                />
+              </CardContent>
+            </Card>
+
+            {/* Slug Card */}
+            <Card className="shadow-lg">
+              <CardHeader className="bg-gradient-to-r">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <RefreshCcw className="w-4 h-4" /> URL Slug
+                </CardTitle>
+              </CardHeader>
+              <CardContent className=" space-y-2">
+                <div className="flex gap-2">
+                  <Input
                     value={slug}
                     onChange={handleSlugChange}
-                    required
+                    placeholder="slug-tu-dong"
                   />
                   <Button
                     type="button"
                     variant="outline"
                     size="icon"
-                    title="Tạo lại slug từ tiêu đề"
                     onClick={regenerateSlug}
                   >
-                    <RefreshCcw className="h-4 w-4" />
+                    <RefreshCcw className="w-4 h-4" />
                   </Button>
                 </div>
                 <p className="text-xs text-gray-500">
-                  💡 Slug sẽ xuất hiện trong URL: <code>/news/{slug || "slug-tu-dong"}</code>
+                  💡 URL: <code className="bg-slate-100 px-1 rounded">/news/{slug || "..."}</code>
                 </p>
-              </div>
-
-              {/* 📸 Thumbnail Upload */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium text-slate-700">
-                  Ảnh đại diện (Thumbnail)
-                </Label>
-                
-                {!thumbnailPreview ? (
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-primary transition-colors">
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={handleThumbnailChange}
-                      className="hidden"
-                      id="thumbnail-upload"
-                    />
-                    <label 
-                      htmlFor="thumbnail-upload" 
-                      className="cursor-pointer flex flex-col items-center gap-3"
-                    >
-                      <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
-                        <Upload className="w-8 h-8 text-gray-400" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-700">
-                          Click để tải ảnh lên
-                        </p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          PNG, JPG, GIF tối đa 5MB
-                        </p>
-                      </div>
-                    </label>
-                  </div>
-                ) : (
-                  <div className="relative border rounded-lg overflow-hidden group">
-                    <img 
-                      src={thumbnailPreview} 
-                      alt="Thumbnail preview" 
-                      className="w-full h-64 object-cover"
-                    />
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="sm"
-                        onClick={removeThumbnail}
-                        className="gap-2"
-                      >
-                        <X className="w-4 h-4" />
-                        Xóa ảnh
-                      </Button>
-                    </div>
-                    {uploading && (
-                      <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
-                        <div className="text-center text-white">
-                          <div className="animate-spin rounded-full h-12 w-12 border-4 border-white border-t-transparent mx-auto mb-2"></div>
-                          <p className="text-sm">Đang tải ảnh lên...</p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Mô tả ngắn */}
-              <div className="space-y-2">
-                <Label htmlFor="shortDescription" className="text-sm font-medium text-slate-700">
-                  Mô tả ngắn
-                </Label>
-                <Textarea
-                  id="shortDescription"
-                  value={shortDescription}
-                  onChange={(e) => setShortDescription(e.target.value)}
-                  placeholder="Nhập mô tả ngắn"
-                  rows={4}
-                  className="resize-none p-3 font-medium whitespace-pre-line"
-                  required
-                />
-              </div>
-
-              {/* Nội dung */}
-              <div className="space-y-2">
-                <Label htmlFor="content" className="text-sm font-medium text-slate-700">
-                  Nội dung
-                </Label>
-                <div className="border rounded-lg bg-white overflow-hidden">
-                  <QuillEditor initialContent={content} onUpdate={handleEditorUpdate} />
-                </div>
-              </div>
-
-              {/* Nút Lưu */}
-              <div className="flex justify-end gap-3 mt-4">
-                <Button
-                  type="submit"
-                  disabled={saving || uploading}
-                  size="lg"
-                  className="from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
-                >
-                  {(saving || uploading) ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
-                      {uploading ? "Đang tải ảnh..." : "Đang lưu..."}
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4 mr-2" />
-                      Lưu tin tức
-                    </>
-                  )}
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
     </div>
+  );
+}
+
+function ThumbnailUpload({ thumbnail, thumbnailPreview, handleThumbnailChange, removeThumbnail, fileInputRef, uploading }) {
+  if (thumbnail && thumbnailPreview) {
+    return (
+      <div className="relative border rounded-lg overflow-hidden group">
+        <img 
+          src={thumbnailPreview} 
+          alt="Preview" 
+          className="w-full h-48 object-cover"
+        />
+        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+          <Button variant="destructive" size="sm" onClick={removeThumbnail}>
+            <X className="w-4 h-4 mr-2" /> Xóa
+          </Button>
+        </div>
+        {uploading && (
+          <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
+            <div className="text-white text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-4 border-white border-t-transparent mx-auto mb-2"></div>
+              <p className="text-xs">Đang tải...</p>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="border-2 border-dashed rounded-lg p-6 text-center hover:border-primary transition-colors">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleThumbnailChange}
+        className="hidden"
+        id="thumbnail-upload"
+      />
+      <label htmlFor="thumbnail-upload" className="cursor-pointer flex flex-col items-center gap-2">
+        <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
+          <Upload className="w-6 h-6 text-gray-400" />
+        </div>
+        <div>
+          <p className="text-xs font-medium">Click để tải ảnh</p>
+          <p className="text-xs text-gray-500">Max 5MB</p>
+        </div>
+      </label>
+    </div>
+  );
+}
+
+function TagsSection({
+  allTags,
+  selectedTags,
+  removeTag,
+  toggleTag,
+  createNewTag,
+  tagsLoading,
+  showTagDropdown,
+  setShowTagDropdown,
+  tagSearch,
+  setTagSearch,
+  filteredTags,
+  hasExactMatch,
+  tagDropdownRef
+}) {
+  return (
+    <>
+      {/* Selected Tags */}
+      {selectedTags.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {selectedTags.map(tagId => {
+            const tag = allTags.find(t => t._id === tagId);
+            return tag ? (
+              <div 
+                key={tagId} 
+                className="px-2.5 py-1 flex items-center gap-1.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium"
+              >
+                <span>{tag.name}</span>
+                <button
+                  type="button"
+                  onClick={() => removeTag(tagId)}
+                  className="hover:text-red-600 focus:outline-none"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ) : null;
+          })}
+        </div>
+      )}
+
+      {/* Add Tag Dropdown */}
+      <div className="relative" ref={tagDropdownRef}>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setShowTagDropdown(!showTagDropdown)}
+          className="w-full justify-start gap-2 h-9"
+          disabled={tagsLoading}
+        >
+          <Plus className="w-4 h-4" />
+          {tagsLoading ? "Đang tải..." : "Thêm tag"}
+        </Button>
+
+        {showTagDropdown && (
+          <div className="absolute z-50 w-full mt-2 bg-white border rounded-lg shadow-lg max-h-64 overflow-auto">
+            <div className="p-2 border-b sticky top-0 bg-white">
+              <Input
+                placeholder="Tìm hoặc tạo tag..."
+                value={tagSearch}
+                onChange={(e) => setTagSearch(e.target.value)}
+                className="h-8 text-sm"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && tagSearch.trim() && !hasExactMatch) {
+                    e.preventDefault();
+                    createNewTag();
+                  }
+                }}
+              />
+            </div>
+            <div className="p-2">
+              {/* Create New Tag */}
+              {tagSearch.trim() && !hasExactMatch && (
+                <div
+                  onClick={createNewTag}
+                  className="px-3 py-2 rounded cursor-pointer hover:bg-green-50 border-b mb-2 bg-green-50/50"
+                >
+                  <span className="text-sm font-medium text-green-700 flex items-center gap-2">
+                    <Plus className="w-4 h-4" />
+                    Tạo: "{tagSearch.trim()}"
+                  </span>
+                </div>
+              )}
+
+              {/* Tag List */}
+              {filteredTags.length === 0 && !tagSearch.trim() ? (
+                <p className="text-sm text-gray-500 text-center py-4">Không có tag</p>
+              ) : (
+                filteredTags.map(tag => (
+                  <div
+                    key={tag._id}
+                    onClick={() => toggleTag(tag._id)}
+                    className={`px-3 py-2 rounded cursor-pointer flex items-center justify-between hover:bg-slate-100 text-sm ${
+                      selectedTags.includes(tag._id) ? 'bg-blue-50 text-blue-700' : ''
+                    }`}
+                  >
+                    <span>{tag.name}</span>
+                    {selectedTags.includes(tag._id) && (
+                      <Badge className="text-xs bg-blue-600 text-white">✓</Badge>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </>
   );
 }

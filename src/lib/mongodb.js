@@ -54,6 +54,20 @@ export async function getDocumentById(collectionName, id) {
   return document;
 }
 
+export async function getDocumentsByIds(collectionName, ids, excludeField = null) {
+  const db = await getDb();
+  
+  // Tạo projection để loại bỏ trường excludeField nếu được cung cấp
+  const projection = excludeField ? { [excludeField]: 0 } : {};
+  
+  const documents = await db.collection(collectionName).find(
+    { _id: { $in: ids } },
+    { projection }
+  ).toArray();
+  
+  return documents;
+}
+
 export async function getDocumentBySlug(collectionName, slug) {
   const db = await getDb();
   const document = await db.collection(collectionName).findOne({ slug: slug });

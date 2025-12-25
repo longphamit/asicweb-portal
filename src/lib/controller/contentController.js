@@ -73,6 +73,25 @@ export const contentController = {
     }
   },
 
+  async getPublishedByIds(ids) {
+    try {
+      console.log("Connecting to MongoDB...");
+      const db = await getDb();
+      console.log("Fetching published contents by ids...");
+      const contents = await db
+        .collection(COLLECTION_NAME)
+        .find({ published: true,_id: { $in: ids } }) // ✅ lọc theo trạng thái đã xuất bản
+        .project({ content: 0 })
+        .limit(5)
+        .sort({ createdAt: -1 })
+        .toArray();
+      return contents;
+    } catch (e) {
+      console.error("Error in getPublished:", e);
+      throw new Error("Lỗi khi lấy danh sách nội dung đã xuất bản");
+    }
+  },
+
   async getById(id) {
     const content = await getDocumentById(COLLECTION_NAME, id);
     return content;
@@ -85,7 +104,7 @@ export const contentController = {
   async update(id, data) {
     const db = await getDb();
     const result = await db.collection(COLLECTION_NAME).updateOne(
-      { _id: new ObjectId(id) },
+      { _id: id },
       { $set: { ...data, updatedAt: new Date() } }
     );
     return result;
