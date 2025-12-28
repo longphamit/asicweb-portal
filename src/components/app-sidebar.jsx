@@ -15,6 +15,7 @@ import {
   IconBook,
   IconDesk,
   IconDeviceDesktop,
+  IconMessage,
 } from "@tabler/icons-react";
 import { NavDocuments } from "@/components/nav-documents";
 import { NavSecondary } from "@/components/nav-secondary";
@@ -141,6 +142,7 @@ export function AppSidebar({ ...props }) {
     { title: "Publications", url: "/dashboard/publications", icon: IconFolder },
     { title: "Courses", url: "/dashboard/courses", icon: IconBook },
     { title: "Devices", url: "/dashboard/devices", icon: IconDeviceDesktop },
+    { title: "Messages", url: "/dashboard/messages", icon: IconMessage },
   ];
 
   const documents = [
