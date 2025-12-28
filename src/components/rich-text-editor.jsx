@@ -21,7 +21,7 @@ const RichTextEditor = forwardRef(({ initialContent, onUpdate }, ref) => {
         ia[i] = byteString.charCodeAt(i);
       }
       const blob = new Blob([ab], { type: mimeString });
-      
+
       const formData = new FormData();
       formData.append("file", blob, "editor-upload.png");
 
@@ -41,28 +41,40 @@ const RichTextEditor = forwardRef(({ initialContent, onUpdate }, ref) => {
       const parser = new DOMParser();
       const doc = parser.parseFromString(content, "text/html");
       const images = doc.querySelectorAll("img[src^='data:image/']");
-      
-      let updatedHtml = content;
+      const host = window.location.origin;
+
+      // 1. Bước đầu: Vẫn upload và thay thế trong DOM để lấy list URL tương đối
       for (const img of images) {
         const base64Src = img.getAttribute("src");
         const fileId = await uploadBase64Image(base64Src);
         if (fileId) {
           const newUrl = `/api/files/${fileId}`;
-          updatedHtml = updatedHtml.replace(base64Src, newUrl);
+          img.setAttribute("src", newUrl);
         }
       }
-      return updatedHtml;
+
+      // 2. Lấy HTML thô từ doc (Lúc này các link thường bị mất host do trình duyệt tối ưu)
+      let finalHtml = doc.body.innerHTML;
+
+      // 3. QUAN TRỌNG: Dùng Regex để ép thêm Host vào tất cả các thẻ img src="/api/files/..."
+      // Tìm các src="/api/" và thay bằng src="http://localhost:3000/api/"
+      const pattern = /src="\/api\/files\//g;
+      finalHtml = finalHtml.replace(pattern, `src="${host}/api/files/`);
+
+      return finalHtml;
     }
   }));
 
   return (
-    <QuillEditor 
-      initialContent={initialContent} 
-      onUpdate={(html) => {
-        setContent(html);
-        if (onUpdate) onUpdate(html);
-      }} 
-    />
+    <div className="rich-text-wrapper min-h-[300px]">
+      <QuillEditor
+        initialContent={initialContent}
+        onUpdate={(html) => {
+          setContent(html);
+          if (onUpdate) onUpdate(html);
+        }}
+      />
+    </div>
   );
 });
 

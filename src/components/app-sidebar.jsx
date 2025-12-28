@@ -13,6 +13,8 @@ import {
   IconDatabase,
   IconInnerShadowTop,
   IconBook,
+  IconDesk,
+  IconDeviceDesktop,
 } from "@tabler/icons-react";
 import { NavDocuments } from "@/components/nav-documents";
 import { NavSecondary } from "@/components/nav-secondary";
@@ -138,6 +140,7 @@ export function AppSidebar({ ...props }) {
     { title: "News", url: "/dashboard/news", icon: IconChartBar },
     { title: "Publications", url: "/dashboard/publications", icon: IconFolder },
     { title: "Courses", url: "/dashboard/courses", icon: IconBook },
+    { title: "Devices", url: "/dashboard/devices", icon: IconDeviceDesktop },
   ];
 
   const documents = [
