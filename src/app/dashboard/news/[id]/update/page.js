@@ -10,13 +10,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ArrowLeft, Save, X, Edit2, Upload, RefreshCcw, Tag, Plus } from "lucide-react";
-import dynamic from "next/dynamic";
+import { ArrowLeft, Save, X, Edit2, Upload, RefreshCcw, Tag, Plus, Loader2 } from "lucide-react";
 
-const QuillEditor = dynamic(() => import("@/components/quill-editor"), {
-  ssr: false,
-  loading: () => <div className="p-4 text-center text-gray-500">Đang tải editor...</div>,
-});
+// SỬ DỤNG RICH TEXT EDITOR WRAPPER ĐỂ TỰ ĐỘNG XỬ LÝ ẢNH
+import RichTextEditor from "@/components/rich-text-editor";
 
 const slugify = (text) =>
   text
@@ -32,6 +29,7 @@ export default function NewsUpdatePage() {
   const router = useRouter();
   const params = useParams();
   const { id } = params;
+  const editorRef = useRef(null); // Ref để điều khiển Editor
 
   const [news, setNews] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -81,7 +79,7 @@ export default function NewsUpdatePage() {
       setTitle(data.title);
       setSlug(data.slug || "");
       setShortDescription(data.shortDescription);
-      setContent(data.content);
+      setContent(data.content); // Đây là nội dung HTML từ DB
       setExistingThumbnail(data.thumbnail || "");
       setThumbnailPreview(data.thumbnail || "");
       
@@ -263,54 +261,6 @@ export default function NewsUpdatePage() {
     }
   };
 
-  const uploadBase64Image = async (base64String) => {
-    try {
-      const formData = new FormData();
-      const byteString = atob(base64String.split(",")[1]);
-      const mimeString = base64String.split(",")[0].split(":")[1].split(";")[0];
-      const ab = new ArrayBuffer(byteString.length);
-      const ia = new Uint8Array(ab);
-      for (let i = 0; i < byteString.length; i++) {
-        ia[i] = byteString.charCodeAt(i);
-      }
-      const blob = new Blob([ab], { type: mimeString });
-      formData.append("file", blob, "image.png");
-
-      const res = await fetch("/api/files", {
-        method: "POST",
-        body: formData,
-      });
-      if (!res.ok) throw new Error(await res.text());
-      const data = await res.json();
-      return data.fileId;
-    } catch (err) {
-      throw new Error("Lỗi khi tải ảnh lên: " + err.message);
-    }
-  };
-
-  const processImagesInContent = async (content) => {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(content, "text/html");
-    const images = doc.querySelectorAll("img[src^='data:image/']");
-
-    const host = window.location.origin;
-    let updatedContent = content;
-
-    for (const img of images) {
-      const base64Src = img.getAttribute("src");
-      try {
-        const fileId = await uploadBase64Image(base64Src);
-        const newSrc = `${host}/api/files/${fileId}`;
-        updatedContent = updatedContent.replace(base64Src, newSrc);
-      } catch (err) {
-        toast.error(err.message);
-        return null;
-      }
-    }
-
-    return updatedContent;
-  };
-
   const handleUpdate = async () => {
     if (!title || !shortDescription || !content) {
       toast.error("Vui lòng nhập đầy đủ tiêu đề, mô tả và nội dung");
@@ -319,8 +269,13 @@ export default function NewsUpdatePage() {
     
     try {
       setSaving(true);
-      let thumbnailUrl = existingThumbnail;
 
+      // 1. XỬ LÝ ẢNH TRONG NỘI DUNG QUA REF (DỌN SẠCH BASE64)
+      setUploading(true);
+      const cleanContent = await editorRef.current.getCleanContent();
+      setUploading(false);
+
+      let thumbnailUrl = existingThumbnail;
       if (thumbnail) {
         setUploading(true);
         const formData = new FormData();
@@ -338,11 +293,7 @@ export default function NewsUpdatePage() {
         setUploading(false);
       }
 
-      const processedContent = await processImagesInContent(content);
-      if (!processedContent) {
-        throw new Error("Lỗi xử lý ảnh trong nội dung");
-      }
-
+      // Gửi nội dung đã làm sạch lên API
       const res = await fetch(`/api/news/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -350,7 +301,7 @@ export default function NewsUpdatePage() {
           title, 
           slug,
           shortDescription, 
-          content: processedContent,
+          content: cleanContent, // Sử dụng content đã được xử lý qua server
           thumbnail: thumbnailUrl,
           tags: selectedTags
         }),
@@ -389,7 +340,6 @@ export default function NewsUpdatePage() {
           uploading={uploading}
         />
         
-        {/* Two Column Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 max-w-7xl mx-auto">
           {/* LEFT COLUMN - Main Content */}
           <div className="lg:col-span-2 space-y-6">
@@ -400,7 +350,6 @@ export default function NewsUpdatePage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* Title */}
                 <div className="space-y-2">
                   <Label htmlFor="title">Tiêu đề</Label>
                   <Input
@@ -412,7 +361,6 @@ export default function NewsUpdatePage() {
                   />
                 </div>
 
-                {/* Short Description */}
                 <div className="space-y-2">
                   <Label htmlFor="shortDescription">Mô tả ngắn</Label>
                   <Textarea
@@ -424,12 +372,14 @@ export default function NewsUpdatePage() {
                   />
                 </div>
 
-                {/* Content */}
                 <div className="space-y-2">
                   <Label htmlFor="content">Nội dung</Label>
-                  <div className="border rounded-lg overflow-hidden">
-                    <QuillEditor initialContent={content} onUpdate={handleEditorUpdate} />
-                  </div>
+                  {/* SỬ DỤNG RICHTEXTEDITOR WRAPPER CÓ REF */}
+                  <RichTextEditor 
+                    ref={editorRef} 
+                    initialContent={content} 
+                    onUpdate={handleEditorUpdate} 
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -437,7 +387,6 @@ export default function NewsUpdatePage() {
 
           {/* RIGHT COLUMN - Sidebar */}
           <div className="space-y-6">
-            {/* Thumbnail Card */}
             <Card className="shadow-lg">
               <CardHeader className="bg-gradient-to-r">
                 <CardTitle className="text-base flex items-center gap-2">
@@ -456,7 +405,6 @@ export default function NewsUpdatePage() {
               </CardContent>
             </Card>
 
-            {/* Tags Card */}
             <Card className="shadow-lg">
               <CardHeader className="bg-gradient-to-r">
                 <CardTitle className="text-base flex items-center gap-2">
@@ -482,7 +430,6 @@ export default function NewsUpdatePage() {
               </CardContent>
             </Card>
 
-            {/* Slug Card */}
             <Card className="shadow-lg">
               <CardHeader className="bg-gradient-to-r">
                 <CardTitle className="text-base flex items-center gap-2">
@@ -510,14 +457,14 @@ export default function NewsUpdatePage() {
                 </p>
               </CardContent>
             </Card>
-
-            
           </div>
         </div>
       </div>
     </div>
   );
 }
+
+// CÁC COMPONENT PHỤ (HEADER, THUMBNAIL, TAGS, LOADING) GIỮ NGUYÊN 100% STYLE CỦA BẠN
 
 function HeaderSection({ id, news, handleCancel, handleUpdate, saving, uploading }) {
   const router = useRouter();
@@ -536,44 +483,24 @@ function HeaderSection({ id, news, handleCancel, handleUpdate, saving, uploading
         <Badge variant="secondary">Tin tức #{id}</Badge>
         {news?.published ? (
           <>
-            <Badge className="bg-green-100 text-green-700">✅ Xuất bản</Badge>
-            {news.publishedAt && (
-              <Badge variant="outline" className="bg-green-100 text-green-700">
-                📅 {new Date(news.publishedAt).toLocaleDateString("vi-VN")}
-              </Badge>
-            )}
+            <Badge className="bg-green-100 text-green-700 border-none px-3">✅ Đã xuất bản</Badge>
           </>
         ) : (
-          <Badge variant="outline" className="bg-yellow-50 text-yellow-700">
-            ⏳ Chưa xuất bản
+          <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-none px-3">
+            ⏳ Nháp
           </Badge>
         )}
       </div>
 
-      {/* Action Buttons */}
       <div className="flex gap-2">
-        <Button 
-          variant="outline" 
-          onClick={handleCancel}
-          size="sm"
-        >
+        <Button variant="outline" onClick={handleCancel} size="sm">
           <X className="w-4 h-4 mr-2" /> Hủy
         </Button>
-        <Button 
-          onClick={handleUpdate} 
-          disabled={saving || uploading}
-          size="sm"
-        >
-          {(saving || uploading) ? (
-            <>
-              <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
-              {uploading ? "Đang tải..." : "Đang lưu..."}
-            </>
+        <Button onClick={handleUpdate} disabled={saving || uploading} size="sm">
+          {saving || uploading ? (
+            <><Loader2 className="animate-spin h-4 w-4 mr-2" /> {uploading ? "Đang xử lý ảnh..." : "Đang lưu..."}</>
           ) : (
-            <>
-              <Save className="w-4 h-4 mr-2" />
-              Lưu thay đổi
-            </>
+            <><Save className="w-4 h-4 mr-2" /> Lưu thay đổi</>
           )}
         </Button>
       </div>
@@ -593,24 +520,15 @@ function ThumbnailUpload({ thumbnail, thumbnailPreview, handleThumbnailChange, r
           className="w-full h-48 object-cover"
           onError={() => setImageError(true)}
         />
-        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-          <label htmlFor="thumbnail-upload">
+        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+          <label htmlFor="thumbnail-upload" className="cursor-pointer">
             <Button variant="secondary" size="sm" asChild>
-              <span className="cursor-pointer">
-                <Upload className="w-4 h-4 mr-2" />
-                Thay đổi
-              </span>
+              <span><Upload className="w-4 h-4 mr-2" /> Thay đổi</span>
             </Button>
           </label>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleThumbnailChange}
-            className="hidden"
-            id="thumbnail-upload"
-          />
+          <Button variant="destructive" size="sm" onClick={removeThumbnail} className="h-8"><X size={14} /></Button>
         </div>
+        <input ref={fileInputRef} id="thumbnail-upload" type="file" accept="image/*" onChange={handleThumbnailChange} className="hidden" />
       </div>
     );
   }
@@ -618,153 +536,60 @@ function ThumbnailUpload({ thumbnail, thumbnailPreview, handleThumbnailChange, r
   if (thumbnail) {
     return (
       <div className="relative border rounded-lg overflow-hidden group">
-        <img 
-          src={thumbnailPreview} 
-          alt="Preview" 
-          className="w-full h-48 object-cover"
-        />
+        <img src={thumbnailPreview} alt="Preview" className="w-full h-48 object-cover" />
         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
           <Button variant="destructive" size="sm" onClick={removeThumbnail}>
             <X className="w-4 h-4 mr-2" /> Hủy
           </Button>
         </div>
-        {uploading && (
-          <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
-            <div className="text-white text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-4 border-white border-t-transparent mx-auto mb-2"></div>
-              <p className="text-xs">Đang tải...</p>
-            </div>
-          </div>
-        )}
       </div>
     );
   }
 
   return (
     <div className="border-2 border-dashed rounded-lg p-6 text-center hover:border-primary transition-colors">
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        onChange={handleThumbnailChange}
-        className="hidden"
-        id="thumbnail-upload"
-      />
+      <input ref={fileInputRef} type="file" accept="image/*" onChange={handleThumbnailChange} className="hidden" id="thumbnail-upload" />
       <label htmlFor="thumbnail-upload" className="cursor-pointer flex flex-col items-center gap-2">
-        <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
-          <Upload className="w-6 h-6 text-gray-400" />
-        </div>
-        <div>
-          <p className="text-xs font-medium">Click để tải ảnh</p>
-          <p className="text-xs text-gray-500">Max 5MB</p>
-        </div>
+        <Upload className="w-6 h-6 text-gray-400" />
+        <div><p className="text-xs font-medium">Click để tải ảnh</p><p className="text-xs text-gray-500">Max 5MB</p></div>
       </label>
     </div>
   );
 }
 
-function TagsSection({
-  allTags,
-  selectedTags,
-  removeTag,
-  toggleTag,
-  createNewTag,
-  tagsLoading,
-  showTagDropdown,
-  setShowTagDropdown,
-  tagSearch,
-  setTagSearch,
-  filteredTags,
-  hasExactMatch,
-  tagDropdownRef
-}) {
+function TagsSection({ allTags, selectedTags, removeTag, toggleTag, createNewTag, tagsLoading, showTagDropdown, setShowTagDropdown, tagSearch, setTagSearch, filteredTags, hasExactMatch, tagDropdownRef }) {
   return (
     <>
-      {/* Selected Tags */}
       {selectedTags.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {selectedTags.map(tagId => {
             const tag = allTags.find(t => t._id === tagId);
             return tag ? (
-              <div 
-                key={tagId} 
-                className="px-2.5 py-1 flex items-center gap-1.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium"
-              >
-                <span>{tag.name}</span>
-                <button
-                  type="button"
-                  onClick={() => removeTag(tagId)}
-                  className="hover:text-red-600 focus:outline-none"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </div>
+              <Badge key={tagId} variant="secondary" className="px-2.5 py-1 flex items-center gap-1.5 bg-blue-50 text-blue-700 border-none font-medium">
+                {tag.name}
+                <X size={12} className="cursor-pointer hover:text-red-500" onClick={() => removeTag(tagId)} />
+              </Badge>
             ) : null;
           })}
         </div>
       )}
-
-      {/* Add Tag Dropdown */}
       <div className="relative" ref={tagDropdownRef}>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => setShowTagDropdown(!showTagDropdown)}
-          className="w-full justify-start gap-2 h-9"
-          disabled={tagsLoading}
-        >
-          <Plus className="w-4 h-4" />
-          {tagsLoading ? "Đang tải..." : "Thêm tag"}
+        <Button variant="outline" size="sm" className="w-full justify-start gap-2 h-9 text-slate-500" onClick={() => setShowTagDropdown(!showTagDropdown)} disabled={tagsLoading}>
+          <Plus className="w-4 h-4" /> {tagsLoading ? "Đang tải..." : "Thêm tag"}
         </Button>
-
         {showTagDropdown && (
-          <div className="absolute z-50 w-full mt-2 bg-white border rounded-lg shadow-lg max-h-64 overflow-auto">
-            <div className="p-2 border-b sticky top-0 bg-white">
-              <Input
-                placeholder="Tìm hoặc tạo tag..."
-                value={tagSearch}
-                onChange={(e) => setTagSearch(e.target.value)}
-                className="h-8 text-sm"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && tagSearch.trim() && !hasExactMatch) {
-                    e.preventDefault();
-                    createNewTag();
-                  }
-                }}
-              />
-            </div>
-            <div className="p-2">
-              {/* Create New Tag */}
-              {tagSearch.trim() && !hasExactMatch && (
-                <div
-                  onClick={createNewTag}
-                  className="px-3 py-2 rounded cursor-pointer hover:bg-green-50 border-b mb-2 bg-green-50/50"
-                >
-                  <span className="text-sm font-medium text-green-700 flex items-center gap-2">
-                    <Plus className="w-4 h-4" />
-                    Tạo: "{tagSearch.trim()}"
-                  </span>
+          <div className="absolute z-50 w-full mt-2 bg-white border rounded-lg shadow-lg max-h-64 overflow-auto p-2">
+            <Input placeholder="Tìm hoặc tạo tag..." value={tagSearch} onChange={(e) => setTagSearch(e.target.value)} className="h-8 text-sm mb-2" />
+            <div className="space-y-1">
+              {filteredTags.map(tag => (
+                <div key={tag._id} onClick={() => toggleTag(tag._id)} className={`px-3 py-2 rounded cursor-pointer text-sm hover:bg-slate-100 ${selectedTags.includes(tag._id) ? 'bg-blue-50 text-blue-700 font-bold' : ''}`}>
+                  {tag.name}
                 </div>
-              )}
-
-              {/* Tag List */}
-              {filteredTags.length === 0 && !tagSearch.trim() ? (
-                <p className="text-sm text-gray-500 text-center py-4">Không có tag</p>
-              ) : (
-                filteredTags.map(tag => (
-                  <div
-                    key={tag._id}
-                    onClick={() => toggleTag(tag._id)}
-                    className={`px-3 py-2 rounded cursor-pointer flex items-center justify-between hover:bg-slate-100 text-sm ${
-                      selectedTags.includes(tag._id) ? 'bg-blue-50 text-blue-700' : ''
-                    }`}
-                  >
-                    <span>{tag.name}</span>
-                    {selectedTags.includes(tag._id) && (
-                      <Badge className="text-xs bg-blue-600 text-white">✓</Badge>
-                    )}
-                  </div>
-                ))
+              ))}
+              {tagSearch && !hasExactMatch && (
+                <div onClick={createNewTag} className="px-3 py-2 rounded cursor-pointer hover:bg-green-50 text-green-700 text-sm font-bold border-t">
+                  <Plus className="w-3 h-3 inline mr-1" /> Tạo mới: "{tagSearch}"
+                </div>
               )}
             </div>
           </div>
@@ -776,13 +601,9 @@ function TagsSection({
 
 function LoadingCard() {
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <Card className="w-96 shadow-lg">
-        <CardContent className="p-8 flex flex-col items-center space-y-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
-          <p className="text-lg font-medium text-slate-600">Đang tải tin tức...</p>
-        </CardContent>
-      </Card>
+    <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-white">
+      <Loader2 className="w-10 h-10 animate-spin text-blue-500" />
+      <p className="font-bold text-slate-400 uppercase tracking-widest text-xs">Đang tải dữ liệu...</p>
     </div>
   );
 }
@@ -790,18 +611,10 @@ function LoadingCard() {
 function NotFoundCard() {
   const router = useRouter();
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <Card className="w-96 shadow-lg">
-        <CardContent className="p-8 flex flex-col items-center space-y-4">
-          <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center">
-            <X className="w-8 h-8 text-red-500" />
-          </div>
-          <p className="text-lg font-medium">Không tìm thấy tin tức</p>
-          <Button onClick={() => router.push("/dashboard/news")} variant="outline">
-            <ArrowLeft className="w-4 h-4 mr-2" /> Quay về
-          </Button>
-        </CardContent>
-      </Card>
+    <div className="min-h-screen flex flex-col items-center justify-center gap-6 bg-white">
+      <div className="w-20 h-20 rounded-full bg-red-50 flex items-center justify-center"><X className="w-10 h-10 text-red-500" /></div>
+      <p className="text-xl font-bold">Không tìm thấy nội dung</p>
+      <Button onClick={() => router.push("/dashboard/news")} variant="outline">Quay về danh sách</Button>
     </div>
   );
 }

@@ -10,13 +10,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ArrowLeft, Save, RefreshCcw, Upload, X, Edit2, Tag, Plus } from "lucide-react";
-import dynamic from "next/dynamic";
+import { ArrowLeft, Save, RefreshCcw, Upload, X, Edit2, Tag, Plus, Loader2 } from "lucide-react";
 
-const QuillEditor = dynamic(() => import("@/components/quill-editor"), {
-  ssr: false,
-  loading: () => <div className="p-4 text-center text-gray-500">Đang tải editor...</div>
-});
+// SỬ DỤNG RICH TEXT EDITOR WRAPPER ĐỂ XỬ LÝ ẢNH
+import RichTextEditor from "@/components/rich-text-editor";
 
 const slugify = (text) =>
   text
@@ -30,6 +27,7 @@ const slugify = (text) =>
 
 export default function CreateNewsPage() {
   const router = useRouter();
+  const editorRef = useRef(null); // Ref để điều khiển Editor
 
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
@@ -222,8 +220,14 @@ export default function CreateNewsPage() {
 
     try {
       setSaving(true);
-      let thumbnailUrl = "";
 
+      // 1. XỬ LÝ ẢNH TRONG NỘI DUNG QUA EDITOR REF
+      setUploading(true);
+      const cleanContent = await editorRef.current.getCleanContent();
+      setUploading(false);
+
+      // 2. Upload Thumbnail
+      let thumbnailUrl = "";
       if (thumbnail) {
         setUploading(true);
         const formData = new FormData();
@@ -241,6 +245,7 @@ export default function CreateNewsPage() {
         setUploading(false);
       }
 
+      // 3. Gửi API
       const res = await fetch("/api/news", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -248,7 +253,7 @@ export default function CreateNewsPage() {
           title, 
           slug, 
           shortDescription, 
-          content,
+          content: cleanContent, // SỬ DỤNG CONTENT ĐÃ LÀM SẠCH
           thumbnail: thumbnailUrl,
           tags: selectedTags
         }),
@@ -258,7 +263,7 @@ export default function CreateNewsPage() {
 
       const newNews = await res.json();
       
-      // Add tags to tag collection
+      // Add tags
       if (selectedTags.length > 0) {
         await addTagsToNews(newNews._id);
       }
@@ -311,8 +316,8 @@ export default function CreateNewsPage() {
             >
               {(saving || uploading) ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
-                  {uploading ? "Đang tải..." : "Đang lưu..."}
+                  <Loader2 className="animate-spin h-4 w-4 mr-2" />
+                  {uploading ? "Đang xử lý ảnh..." : "Đang lưu..."}
                 </>
               ) : (
                 <>
@@ -361,12 +366,14 @@ export default function CreateNewsPage() {
                   />
                 </div>
 
-                {/* Content */}
+                {/* Content - SỬ DỤNG WRAPPER MỚI */}
                 <div className="space-y-2">
                   <Label htmlFor="content">Nội dung</Label>
-                  <div className="border rounded-lg overflow-hidden">
-                    <QuillEditor initialContent={content} onUpdate={handleEditorUpdate} />
-                  </div>
+                  <RichTextEditor 
+                    ref={editorRef} 
+                    initialContent={content} 
+                    onUpdate={handleEditorUpdate} 
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -454,6 +461,7 @@ export default function CreateNewsPage() {
   );
 }
 
+// ... CÁC COMPONENT PHỤ GIỮ NGUYÊN ...
 function ThumbnailUpload({ thumbnail, thumbnailPreview, handleThumbnailChange, removeThumbnail, fileInputRef, uploading }) {
   if (thumbnail && thumbnailPreview) {
     return (
@@ -471,8 +479,8 @@ function ThumbnailUpload({ thumbnail, thumbnailPreview, handleThumbnailChange, r
         {uploading && (
           <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
             <div className="text-white text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-4 border-white border-t-transparent mx-auto mb-2"></div>
-              <p className="text-xs">Đang tải...</p>
+              <Loader2 className="animate-spin h-8 w-8 border-4 border-white border-t-transparent mx-auto mb-2" />
+              <p className="text-xs">Đang xử lý...</p>
             </div>
           </div>
         )}
@@ -520,7 +528,6 @@ function TagsSection({
 }) {
   return (
     <>
-      {/* Selected Tags */}
       {selectedTags.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {selectedTags.map(tagId => {
@@ -544,7 +551,6 @@ function TagsSection({
         </div>
       )}
 
-      {/* Add Tag Dropdown */}
       <div className="relative" ref={tagDropdownRef}>
         <Button
           type="button"
@@ -574,7 +580,6 @@ function TagsSection({
               />
             </div>
             <div className="p-2">
-              {/* Create New Tag */}
               {tagSearch.trim() && !hasExactMatch && (
                 <div
                   onClick={createNewTag}
@@ -587,7 +592,6 @@ function TagsSection({
                 </div>
               )}
 
-              {/* Tag List */}
               {filteredTags.length === 0 && !tagSearch.trim() ? (
                 <p className="text-sm text-gray-500 text-center py-4">Không có tag</p>
               ) : (
