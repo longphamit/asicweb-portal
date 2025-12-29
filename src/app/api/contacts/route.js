@@ -2,6 +2,20 @@
 import { NextResponse } from "next/server";
 import { messageController }  from '../../../lib/controller/messageController';
 
+
+// Cấu hình các Header chung
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "https://asic.uit.edu.vn",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
+
+// 🛡️ Xử lý Preflight Request (Bắt buộc cho PUT/DELETE)
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
+
 export async function GET(req) {
   try {
     // 🔍 Lấy query params từ URL   published
@@ -25,7 +39,7 @@ export async function POST(req) {
   try {
     const body = await req.json();
     const result = await messageController.create(body);
-    return NextResponse.json(result);
+    return NextResponse.json(result, { headers: corsHeaders });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
